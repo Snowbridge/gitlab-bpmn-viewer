@@ -4,12 +4,147 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GitLab BPMN Viewer — Настройки</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #333;
+        background: #fff;
+        margin: 24px;
+        max-width: 640px;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          color: #e5e5e5;
+          background: #1f1f1f;
+        }
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 16px;
+      }
+      .description {
+        color: #666;
+        margin-bottom: 20px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .description {
+          color: #999;
+        }
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+        align-items: flex-start;
+      }
+      .row input {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .row input {
+          background: #2d2d2d;
+          border-color: #444;
+          color: #e5e5e5;
+        }
+      }
+      .row input:focus {
+        outline: none;
+        border-color: #1f75cb;
+      }
+      .row .host-input {
+        min-width: 180px;
+      }
+      .row .token-input {
+        min-width: 200px;
+      }
+      button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #1f75cb;
+        color: #fff;
+      }
+      button.primary:hover {
+        background: #1068bf;
+      }
+      button.secondary {
+        background: transparent;
+        color: #666;
+        border: 1px solid #ddd;
+      }
+      @media (prefers-color-scheme: dark) {
+        button.secondary {
+          color: #999;
+          border-color: #444;
+        }
+      }
+      button.secondary:hover {
+        background: #f5f5f5;
+      }
+      @media (prefers-color-scheme: dark) {
+        button.secondary:hover {
+          background: #2d2d2d;
+        }
+      }
+      button.danger {
+        background: transparent;
+        color: #c00;
+        border: 1px solid #c00;
+      }
+      button.danger:hover {
+        background: #fee;
+      }
+      .hosts-list {
+        margin-bottom: 20px;
+      }
+      .hosts-list .row:last-child {
+        margin-bottom: 0;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .status {
+        margin-top: 16px;
+        font-size: 13px;
+        color: #0b8a00;
+      }
+      .status.error {
+        color: #c00;
+      }
+    </style>
   </head>
   <body>
-    <div id="app">
-      <h1>Настройки GitLab BPMN Viewer</h1>
-      <p>Форма настроек (host + token) будет здесь.</p>
-    </div>
+    <h1>Настройки GitLab BPMN Viewer</h1>
+    <p class="description">
+      Укажите хосты GitLab и токены API. Расширение работает только на
+      настроенных доменах.
+    </p>
+    <form id="settings-form">
+      <div class="hosts-list" id="hosts-list"></div>
+      <button type="button" id="add-host" class="secondary">
+        + Добавить хост
+      </button>
+      <div class="actions">
+        <button type="submit" class="primary">Сохранить</button>
+      </div>
+      <div id="status" class="status"></div>
+    </form>
     <script type="module" src="./options.ts"></script>
   </body>
 </html>
