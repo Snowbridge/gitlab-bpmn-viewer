@@ -163,8 +163,12 @@ async function renderBlobBpmn(): Promise<void> {
   showDiagram();
 }
 
+/** URL страницы, для которой уже выполнялся init (избегаем двойного запуска). */
+let lastInitUrl: string | null = null;
+
 async function init(): Promise<void> {
-  const host = getHostFromUrl(window.location.href);
+  const url = window.location.href;
+  const host = getHostFromUrl(url);
   if (!host) {
     return;
   }
@@ -174,13 +178,66 @@ async function init(): Promise<void> {
     return;
   }
 
-  const blobParts = parseBlobUrl(window.location.href);
+  const blobParts = parseBlobUrl(url);
   if (blobParts) {
+    if (lastInitUrl === url) {
+      return;
+    }
+    lastInitUrl = url;
     await renderBlobBpmn();
   } else {
+    lastInitUrl = url;
     // TODO: 3.2, 3.4 — контекстное меню, diff
     console.log("[GitLab BPMN Viewer] Content active for host:", host);
   }
 }
 
+/** Интервал опроса URL (мс); срабатывает при переходе на blob без полной перезагрузки. */
+const URL_POLL_INTERVAL_MS = 350;
+/** Таймер опроса URL. */
+let urlPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startUrlPolling(): void {
+  if (urlPollTimer !== null) return;
+  urlPollTimer = setInterval(() => {
+    const url = window.location.href;
+    if (!parseBlobUrl(url)) return;
+    if (url === lastInitUrl) return;
+    const host = getHostFromUrl(url);
+    if (!host) return;
+    loadSettings().then((settings) => {
+      if (!isHostConfigured(settings, host)) return;
+      init();
+    });
+  }, URL_POLL_INTERVAL_MS);
+}
+
+/** Запуск init при навигации без полной перезагрузки. */
+function setupNavigationListeners(): void {
+  document.addEventListener("turbo:load", () => init());
+  window.addEventListener("popstate", () => init());
+
+  const runInitAfterUrlChange = (): void => {
+    setTimeout(() => init(), 200);
+  };
+  const origPushState = history.pushState;
+  const origReplaceState = history.replaceState;
+  history.pushState = function (
+    ...args: Parameters<typeof history.pushState>
+  ): void {
+    origPushState.apply(this, args);
+    runInitAfterUrlChange();
+  };
+  history.replaceState = function (
+    ...args: Parameters<typeof history.replaceState>
+  ): void {
+    origReplaceState.apply(this, args);
+    runInitAfterUrlChange();
+  };
+
+  // Надёжный fallback: опрос URL (GitLab может использовать turbo-frame без turbo:load на document)
+  startUrlPolling();
+}
+
 init();
+setupNavigationListeners();
