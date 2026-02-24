@@ -17,10 +17,10 @@ import {
 } from "../lib";
 
 const BLOB_VIEWER_SELECTOR =
-  "#fileHolder > div.gl-flex.blob-viewer > div";
+  "#fileHolder .file-content.code.blob-content";
 
 const BUTTON_GROUP_SELECTOR =
-  "#fileHolder > div.js-file-title.file-title-flex-parent > div.file-actions.gl-flex.gl-flex-wrap.gl-gap-3 > div.gl-hidden.\\@sm\\/panel\\:gl-inline-flex.gl-button-group.btn-group";
+  "#fileHolder div.file-actions > :last-child";
 
 const MAX_WAIT_MS = 5000;
 const POLL_INTERVAL_MS = 100;
