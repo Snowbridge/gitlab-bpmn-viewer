@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitLab BPMN Viewer",
-  "version": "0.2.2",
+  "version": "0.2.4",
   "description": "Визуализация BPMN-диаграмм в GitLab для code review и навигации по .bpmn файлам",
   "icons": {
     "16": "icons/icon16.png",
@@ -42,7 +42,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["public/icons/*"],
+      "resources": ["icons/*"],
       "matches": ["<all_urls>"]
     }
   ]

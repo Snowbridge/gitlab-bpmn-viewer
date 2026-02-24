@@ -5,6 +5,7 @@
 import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-js.css";
 
+import browser from "webextension-polyfill";
 import NavigatedViewer from "bpmn-js/lib/NavigatedViewer";
 import {
   fetchFileRaw,
@@ -17,6 +18,9 @@ import {
 
 const BLOB_VIEWER_SELECTOR =
   "#fileHolder > div.gl-flex.blob-viewer > div";
+
+const BUTTON_GROUP_SELECTOR =
+  "#fileHolder > div.js-file-title.file-title-flex-parent > div.file-actions.gl-flex.gl-flex-wrap.gl-gap-3 > div.gl-hidden.\\@sm\\/panel\\:gl-inline-flex.gl-button-group.btn-group";
 
 const MAX_WAIT_MS = 5000;
 const POLL_INTERVAL_MS = 100;
@@ -65,7 +69,10 @@ async function renderBlobBpmn(): Promise<void> {
     return;
   }
 
-  const target = await waitForElement(BLOB_VIEWER_SELECTOR);
+  const [target, buttonGroup] = await Promise.all([
+    waitForElement(BLOB_VIEWER_SELECTOR),
+    waitForElement(BUTTON_GROUP_SELECTOR),
+  ]);
   const originalContent = target.innerHTML;
   const originalDisplay = target.style.display;
 
@@ -90,20 +97,21 @@ async function renderBlobBpmn(): Promise<void> {
   diagramContainer.style.cssText =
     "width:100%;min-height:400px;height:600px;position:relative;";
 
-  const toolbar = document.createElement("div");
-  toolbar.className = "gl-bpmn-viewer-toolbar";
-  toolbar.style.cssText =
-    "display:flex;gap:8px;align-items:center;padding:8px 0;margin-bottom:8px;";
+  function createIconButton(iconPath: string, title: string): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "gl-button btn btn-default btn-md";
+    btn.title = title;
+    const img = document.createElement("img");
+    img.src = browser.runtime.getURL(iconPath);
+    img.alt = title;
+    img.style.cssText = "width:16px;height:16px;display:block;";
+    btn.appendChild(img);
+    return btn;
+  }
 
-  const sourceBtn = document.createElement("button");
-  sourceBtn.type = "button";
-  sourceBtn.className = "gl-button btn btn-default btn-md";
-  sourceBtn.textContent = "Исходный код";
-
-  const diagramBtn = document.createElement("button");
-  diagramBtn.type = "button";
-  diagramBtn.className = "gl-button btn btn-default btn-md";
-  diagramBtn.textContent = "Диаграмма";
+  const sourceBtn = createIconButton("icons/icon16gray.png", "Исходный код");
+  const diagramBtn = createIconButton("icons/icon16.png", "Диаграмма");
   diagramBtn.style.display = "none";
 
   const sourceContainer = document.createElement("div");
@@ -130,12 +138,11 @@ async function renderBlobBpmn(): Promise<void> {
   sourceBtn.addEventListener("click", showSource);
   diagramBtn.addEventListener("click", showDiagram);
 
-  toolbar.appendChild(sourceBtn);
-  toolbar.appendChild(diagramBtn);
+  buttonGroup.appendChild(sourceBtn);
+  buttonGroup.appendChild(diagramBtn);
 
   target.innerHTML = "";
   target.style.display = "block";
-  target.appendChild(toolbar);
   target.appendChild(diagramContainer);
   target.appendChild(sourceContainer);
 
