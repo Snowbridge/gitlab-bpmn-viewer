@@ -5,47 +5,45 @@ import browser from "webextension-polyfill";
 
 import { getHostFromUrl, isHostConfigured, loadSettings } from "./../lib/settings";
 
-const ICON_ENABLED = "src/icons/icon16.png";
-const ICON_DISABLED = "src/icons/icon16gray.png";
+const ICON_ENABLED = "/icons/icon16.png";
+const ICON_DISABLED = "/icons/icon16gray.png";
 
 async function updateIconForTab(tabId: number, url?: string): Promise<void> {
-  if (!url || !url.startsWith("http")) {
-    await browser.action.setIcon({
-      tabId,
-      path: ICON_DISABLED,
-    });
-    return;
+  let path = ICON_DISABLED;
+  if (url && url.startsWith("http")) {
+    const host = getHostFromUrl(url);
+    const settings = await loadSettings();
+    if (host && isHostConfigured(settings, host)) {
+      path = ICON_ENABLED;
+    }
   }
 
-  const host = getHostFromUrl(url);
-  const settings = await loadSettings();
-  const configured = host ? isHostConfigured(settings, host) : false;
-
-  await browser.action.setIcon({
-    tabId,
-    path: configured ? ICON_ENABLED : ICON_DISABLED,
-  });
+  await browser.action.setIcon({ tabId, path });
 }
 
 async function updateActiveTabIcon(): Promise<void> {
-  const [tab] = await browser.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
-  if (tab?.id && tab.url) {
-    await updateIconForTab(tab.id, tab.url);
+  try {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (tab?.id != null) {
+      await updateIconForTab(tab.id, tab.url);
+    }
+  } catch {
+    // Игнорируем (например, нет доступа к вкладке)
   }
 }
 
 browser.runtime.onInstalled.addListener(() => {
-  console.log("[GitLab BPMN Viewer] Extension installed");
+  updateActiveTabIcon();
 });
 
-browser.tabs.onActivated.addListener(async (activeInfo) => {
-  const tab = await browser.tabs.get(activeInfo.tabId);
-  if (tab?.url) {
-    await updateIconForTab(activeInfo.tabId, tab.url);
-  }
+browser.tabs.onActivated.addListener((activeInfo) => {
+  browser.tabs.get(activeInfo.tabId).then(
+    (tab) => updateIconForTab(activeInfo.tabId, tab.url),
+    () => updateIconForTab(activeInfo.tabId, undefined)
+  );
 });
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -60,5 +58,4 @@ browser.storage.onChanged.addListener((_changes, areaName) => {
   }
 });
 
-// Инициализация иконки при старте
 updateActiveTabIcon();
