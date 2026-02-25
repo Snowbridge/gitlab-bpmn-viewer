@@ -146,25 +146,28 @@ function openDiagramModal(diagramBtn: HTMLElement): void {
     let from: string;
     let to: string;
     try {
-      const { source_branch, target_branch } = await fetchMergeRequest(
+      const mrInfo = await fetchMergeRequest(
         origin,
         token,
         mrParams.projectPath,
         mrParams.mrIid
       );
+      // Используем SHA коммитов, если есть (работает и для смерженных MR с удалённой source branch)
+      const refSource = mrInfo.diff_refs?.head_sha ?? mrInfo.source_branch;
+      const refTarget = mrInfo.diff_refs?.start_sha ?? mrInfo.target_branch;
       const [fromContent, toContent] = await Promise.all([
         fetchFileRaw(
           origin,
           token,
           mrParams.projectPath,
-          source_branch,
+          refSource,
           filePath
         ),
         fetchFileRaw(
           origin,
           token,
           mrParams.projectPath,
-          target_branch,
+          refTarget,
           filePath
         ),
       ]);

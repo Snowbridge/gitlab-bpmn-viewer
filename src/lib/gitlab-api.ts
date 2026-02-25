@@ -69,6 +69,21 @@ export function parseMergeRequestDiffsUrl(url: string): {
   }
 }
 
+/** Ссылки на коммиты диффа MR (не зависят от удалённых веток). */
+export interface MergeRequestDiffRefs {
+  /** SHA коммита в target branch (база для диффа). */
+  start_sha: string;
+  /** SHA коммита в source branch (голова MR). */
+  head_sha: string;
+}
+
+export interface MergeRequestInfo {
+  source_branch: string;
+  target_branch: string;
+  /** При наличии — используем SHA вместо имён веток (работает и для смерженных MR с удалённой source branch). */
+  diff_refs?: MergeRequestDiffRefs;
+}
+
 /**
  * Загружает данные merge request через GitLab API v4.
  * GET /projects/:id/merge_requests/:merge_request_iid
@@ -78,10 +93,9 @@ export async function fetchMergeRequest(
   token: string,
   projectPath: string,
   mrIid: number
-): Promise<{ source_branch: string; target_branch: string }> {
+): Promise<MergeRequestInfo> {
   const base = origin.replace(/\/$/, "");
-  const projectId = encodeURIComponent(projectPath);
-  const url = `${base}/api/v4/projects/${projectId}/merge_requests/${mrIid}`;
+  const url = `${base}/api/v4/projects/${encodeURIComponent(projectPath)}/merge_requests/${mrIid}`;
   const response = await fetch(url, {
     headers: {
       "PRIVATE-TOKEN": token,
@@ -95,11 +109,19 @@ export async function fetchMergeRequest(
   const data = (await response.json()) as {
     source_branch: string;
     target_branch: string;
+    diff_refs?: { base_sha: string; start_sha: string; head_sha: string };
   };
-  return {
+  const result: MergeRequestInfo = {
     source_branch: data.source_branch,
     target_branch: data.target_branch,
   };
+  if (data.diff_refs?.start_sha && data.diff_refs?.head_sha) {
+    result.diff_refs = {
+      start_sha: data.diff_refs.start_sha,
+      head_sha: data.diff_refs.head_sha,
+    };
+  }
+  return result;
 }
 
 /**
@@ -114,9 +136,9 @@ export async function fetchFileRaw(
   filePath: string
 ): Promise<string> {
   const base = origin.replace(/\/$/, "");
-  const projectId = encodeURIComponent(projectPath);
+  // Путь проекта в URL не кодируем (слэши остаются сегментами пути). Кодируем только путь к файлу.
   const encodedFilePath = encodeURIComponent(filePath);
-  const url = `${base}/api/v4/projects/${projectId}/repository/files/${encodedFilePath}/raw?ref=${encodeURIComponent(ref)}`;
+  const url = `${base}/api/v4/projects/${encodeURIComponent(projectPath)}/repository/files/${encodedFilePath}/raw?ref=${encodeURIComponent(ref)}`;
   const response = await fetch(url, {
     headers: {
       "PRIVATE-TOKEN": token,
