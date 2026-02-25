@@ -45,6 +45,41 @@ function getThirdParent(el: HTMLElement): HTMLElement | null {
 /** Имя кастомного события: контекст страницы вызывает APP.loadSource по данным из content script. */
 const DIFF_APPLY_EVENT = "gl-bpmn-diff-apply";
 
+function is404Error(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err.message.includes("404") || (err as { status?: number }).status === 404)
+  );
+}
+
+/**
+ * Показывает предупреждение пользователю (файл отсутствует в одной из веток).
+ */
+function showWarning(message: string): void {
+  const box = document.createElement("div");
+  box.setAttribute("role", "alert");
+  box.className = "gl-bpmn-diff-warning";
+  box.style.cssText = [
+    "position:fixed",
+    "top:16px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "z-index:10000",
+    "max-width:90vw",
+    "padding:12px 20px",
+    "background:var(--gl-warning-bg, #fcf8e3)",
+    "border:1px solid var(--gl-warning-border, #f5e79e)",
+    "border-radius:6px",
+    "color:var(--gl-warning-text, #8a6d3b)",
+    "font-size:14px",
+    "line-height:1.4",
+    "box-shadow:0 2px 12px rgba(0,0,0,0.15)",
+  ].join(";");
+  box.textContent = message;
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 8000);
+}
+
 /**
  * Инжектирует в контекст страницы скрипт (внешний файл), который слушает событие с from/to и вызывает APP.loadSource.
  * Внешний скрипт нужен из‑за CSP: inline script на странице блокируется.
@@ -56,10 +91,60 @@ function injectDiffApplyBridge(): void {
 }
 
 /**
- * Открывает модальное окно, загружает две версии файла (from/to branch) и передаёт их в APP.loadSource.
- * @param diagramBtn — кнопка «Открыть диаграмму»; у её третьего родителя берётся data-path.
+ * Загружает обе версии файла. При 404 (файл добавлен/удалён в MR) возвращает сообщение об ошибке вместо контента.
  */
-function openDiagramModal(diagramBtn: HTMLElement): void {
+async function fetchBothVersionsOrError(
+  origin: string,
+  token: string,
+  projectPath: string,
+  filePath: string,
+  refSource: string,
+  refTarget: string
+): Promise<
+  | { from: string; to: string }
+  | { error: string }
+> {
+  const [sourceResult, targetResult] = await Promise.allSettled([
+    fetchFileRaw(origin, token, projectPath, refSource, filePath),
+    fetchFileRaw(origin, token, projectPath, refTarget, filePath),
+  ]);
+
+  if (sourceResult.status === "rejected") {
+    if (is404Error(sourceResult.reason)) {
+      return {
+        error:
+          "Файл отсутствует в исходной ветке (удалён в MR). Сравнение диаграмм недоступно.",
+      };
+    }
+    console.error("[GitLab BPMN Viewer] Failed to fetch source version:", sourceResult.reason);
+    return { error: "Не удалось загрузить версию из исходной ветки." };
+  }
+  if (targetResult.status === "rejected") {
+    if (is404Error(targetResult.reason)) {
+      return {
+        error:
+          "Файл отсутствует в целевой ветке (добавлен в MR). Сравнение диаграмм недоступно.",
+      };
+    }
+    console.error("[GitLab BPMN Viewer] Failed to fetch target version:", targetResult.reason);
+    return { error: "Не удалось загрузить версию из целевой ветки." };
+  }
+
+  return {
+    from: sourceResult.value,
+    to: targetResult.value,
+  };
+}
+
+/**
+ * Открывает модальное окно и передаёт уже загруженные from/to в APP.loadSource.
+ * @param diagramBtn — кнопка (для закрытия по необходимости не используется, оставлен для единообразия).
+ */
+function openDiagramModalWithContent(
+  _diagramBtn: HTMLElement,
+  from: string,
+  to: string
+): void {
   const wrap = document.createElement("div");
   wrap.innerHTML = modalTemplate;
   const overlay = wrap.querySelector<HTMLElement>(MODAL_OVERLAY_SELECTOR);
@@ -87,19 +172,24 @@ function openDiagramModal(diagramBtn: HTMLElement): void {
 
   document.body.appendChild(overlayEl);
 
-  // Мост: скрипт в контексте страницы слушает событие и вызывает APP.loadSource (APP виден только там)
   injectDiffApplyBridge();
 
-  // Подгрузка и запуск скрипта диффа (соответствует diff.html + app-d.js)
   const script = document.createElement("script");
   script.src = browser.runtime.getURL("scripts/diff-app.js");
   script.async = true;
   script.onload = (): void => {
-    loadAndShowDiff();
+    document.dispatchEvent(
+      new CustomEvent(DIFF_APPLY_EVENT, { detail: { from, to } })
+    );
   };
   overlayEl.appendChild(script);
+}
 
-  async function loadAndShowDiff(): Promise<void> {
+/**
+ * По клику: проверяет наличие файла в обеих ветках, при 404 показывает предупреждение, иначе открывает модалку с диффом.
+ */
+function onDiagramButtonClick(diagramBtn: HTMLElement): void {
+  (async () => {
     const thirdParent = getThirdParent(diagramBtn);
     const filePath = thirdParent?.getAttribute("data-path") ?? null;
     if (!filePath) {
@@ -109,17 +199,11 @@ function openDiagramModal(diagramBtn: HTMLElement): void {
 
     const url = window.location.href;
     const host = getHostFromUrl(url);
-    if (!host) {
-      return;
-    }
+    if (!host) return;
     const settings = await loadSettings();
-    if (!isHostConfigured(settings, host)) {
-      return;
-    }
+    if (!isHostConfigured(settings, host)) return;
     const token = getTokenForHost(settings, host);
-    if (!token) {
-      return;
-    }
+    if (!token) return;
 
     const mrParams = parseMergeRequestDiffsUrl(url);
     if (!mrParams) {
@@ -128,46 +212,38 @@ function openDiagramModal(diagramBtn: HTMLElement): void {
     }
 
     const origin = window.location.origin;
-
-    let from: string;
-    let to: string;
+    let mrInfo: Awaited<ReturnType<typeof fetchMergeRequest>>;
     try {
-      const mrInfo = await fetchMergeRequest(
+      mrInfo = await fetchMergeRequest(
         origin,
         token,
         mrParams.projectPath,
         mrParams.mrIid
       );
-      // Используем SHA коммитов, если есть (работает и для смерженных MR с удалённой source branch)
-      const refSource = mrInfo.diff_refs?.head_sha ?? mrInfo.source_branch;
-      const refTarget = mrInfo.diff_refs?.start_sha ?? mrInfo.target_branch;
-      const [fromContent, toContent] = await Promise.all([
-        fetchFileRaw(
-          origin,
-          token,
-          mrParams.projectPath,
-          refSource,
-          filePath
-        ),
-        fetchFileRaw(
-          origin,
-          token,
-          mrParams.projectPath,
-          refTarget,
-          filePath
-        ),
-      ]);
-      from = fromContent;
-      to = toContent;
     } catch (err) {
-      console.error("[GitLab BPMN Viewer] Failed to fetch file versions:", err);
+      console.error("[GitLab BPMN Viewer] Failed to fetch MR:", err);
       return;
     }
 
-    document.dispatchEvent(
-      new CustomEvent(DIFF_APPLY_EVENT, { detail: { from, to } })
+    const refSource = mrInfo.diff_refs?.head_sha ?? mrInfo.source_branch;
+    const refTarget = mrInfo.diff_refs?.start_sha ?? mrInfo.target_branch;
+
+    const result = await fetchBothVersionsOrError(
+      origin,
+      token,
+      mrParams.projectPath,
+      filePath,
+      refSource,
+      refTarget
     );
-  }
+
+    if ("error" in result) {
+      showWarning(result.error);
+      return;
+    }
+
+    openDiagramModalWithContent(diagramBtn, result.from, result.to);
+  })();
 }
 
 export function isDiffPage(url: string): boolean {
@@ -197,7 +273,7 @@ function injectDiffDiagramButtons(): void {
       "Открыть диаграмму"
     );
     diagramBtn.addEventListener("click", () => {
-      openDiagramModal(diagramBtn);
+      onDiagramButtonClick(diagramBtn);
     });
 
     fileActions.insertBefore(diagramBtn, fileActions.firstChild);
