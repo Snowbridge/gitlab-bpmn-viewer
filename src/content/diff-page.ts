@@ -16,15 +16,6 @@ import {
 } from "../lib";
 import { createIconButton } from "./utils";
 
-/** Глобальный объект APP, добавляемый скриптом diff-app.js */
-declare global {
-  interface Window {
-    APP?: {
-      loadSource: (panel: "left" | "right", payload: { xml: string }) => void;
-    };
-  }
-}
-
 /** Маска дифф-страницы MR: любой хост / путь / - / merge_requests / id / diffs */
 const DIFF_PAGE_PATH_REGEX = /\/-\/merge_requests\/\d+\/diffs\/?$/;
 
@@ -51,25 +42,17 @@ function getThirdParent(el: HTMLElement): HTMLElement | null {
   return current;
 }
 
+/** Имя кастомного события: контекст страницы вызывает APP.loadSource по данным из content script. */
+const DIFF_APPLY_EVENT = "gl-bpmn-diff-apply";
+
 /**
- * Ждёт появления глобального APP (после загрузки diff-app.js).
+ * Инжектирует в контекст страницы скрипт (внешний файл), который слушает событие с from/to и вызывает APP.loadSource.
+ * Внешний скрипт нужен из‑за CSP: inline script на странице блокируется.
  */
-function waitForAPP(timeoutMs = 10000): Promise<NonNullable<Window["APP"]>> {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
-    const check = (): void => {
-      if (window.APP) {
-        resolve(window.APP);
-        return;
-      }
-      if (Date.now() >= deadline) {
-        reject(new Error("APP not loaded"));
-        return;
-      }
-      setTimeout(check, 50);
-    };
-    check();
-  });
+function injectDiffApplyBridge(): void {
+  const script = document.createElement("script");
+  script.src = browser.runtime.getURL("scripts/diff-apply-bridge.js");
+  ;(document.head || document.documentElement).appendChild(script);
 }
 
 /**
@@ -103,6 +86,9 @@ function openDiagramModal(diagramBtn: HTMLElement): void {
   document.addEventListener("keydown", onEscape);
 
   document.body.appendChild(overlayEl);
+
+  // Мост: скрипт в контексте страницы слушает событие и вызывает APP.loadSource (APP виден только там)
+  injectDiffApplyBridge();
 
   // Подгрузка и запуск скрипта диффа (соответствует diff.html + app-d.js)
   const script = document.createElement("script");
@@ -178,13 +164,9 @@ function openDiagramModal(diagramBtn: HTMLElement): void {
       return;
     }
 
-    try {
-      const APP = await waitForAPP();
-      APP.loadSource("left", { xml: to });
-      APP.loadSource("right", { xml: from });
-    } catch (err) {
-      console.error("[GitLab BPMN Viewer] APP.loadSource failed:", err);
-    }
+    document.dispatchEvent(
+      new CustomEvent(DIFF_APPLY_EVENT, { detail: { from, to } })
+    );
   }
 }
 
