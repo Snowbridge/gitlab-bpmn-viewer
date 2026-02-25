@@ -1,6 +1,25 @@
 <div class="gl-bpmn-diff-modal-overlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)">
-  <div class="gl-bpmn-diff-modal-box" style="position:relative;width:80%;height:80%;max-width:80vw;max-height:80vh;background:var(--gl-modal-bg, #fff);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center">
-    <button type="button" class="gl-bpmn-diff-modal-close" aria-label="Закрыть" style="position:absolute;top:8px;right:8px;width:32px;height:32px;padding:0;border:none;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:var(--gl-modal-close-color, #666)">×</button>
-    <p class="gl-bpmn-diff-modal-body" style="margin:0;font-size:1.25rem">Hello world</p>
+  <div class="gl-bpmn-diff-modal-box" style="position:relative;width:80%;height:80%;max-width:80vw;max-height:80vh;background:var(--gl-modal-bg, #fff);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);overflow:hidden;display:flex;flex-direction:column">
+    <button type="button" class="gl-bpmn-diff-modal-close" aria-label="Закрыть" style="position:absolute;top:8px;right:8px;width:32px;height:32px;padding:0;border:none;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:var(--gl-modal-close-color, #666);z-index:11">×</button>
+    <div class="content" style="width:100%;height:100%;overflow:hidden;position:relative;display:table">
+      <div class="di-container left drop-zone" target="left" style="height:100%;width:50%;position:relative;display:table-cell;border-collapse:collapse;border-right:dotted 10px #CCC">
+        <div class="io-control di-header" style="position:absolute;top:0;z-index:10;margin:20px;padding:10px;background:#EEE;border-radius:5px;opacity:0.9">
+          <h2 style="margin-top:0">version A</h2>
+          <input class="file" type="file" target="left">
+        </div>
+        <div class="canvas" id="canvas-left" style="display:block;height:100%"></div>
+      </div>
+      <div class="di-container right drop-zone" target="right" style="height:100%;width:50%;position:relative;display:table-cell;border-collapse:collapse">
+        <div class="io-control di-header" style="position:absolute;top:0;right:0;z-index:10;margin:20px;padding:10px;background:#EEE;border-radius:5px;opacity:0.9;text-align:right">
+          <h2 style="margin-top:0">version B</h2>
+          <input class="file" type="file" target="right">
+        </div>
+        <div class="canvas" id="canvas-right" style="display:block;height:100%"></div>
+      </div>
+      <div id="changes-overview" class="collapsed" style="position:absolute;bottom:0;left:0;right:0">
+        <div class="io-control show-hide-toggle" style="background:#FFF;border:1px solid #EEE;border-radius:2px;padding:5px;cursor:pointer">List of Changes</div>
+        <div class="io-control changes" style="background:#FFF;border:1px solid #EEE;border-radius:2px;padding:5px"></div>
+      </div>
+    </div>
   </div>
 </div>

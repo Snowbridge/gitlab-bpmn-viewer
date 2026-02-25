@@ -3,6 +3,7 @@
  * Ответственность: только страницы вкладки «Changes» MR (маска merge_requests / id / diffs).
  */
 
+import browser from "webextension-polyfill";
 import modalTemplate from "./diff-modal.html?raw";
 import { createIconButton } from "./utils";
 
@@ -52,6 +53,12 @@ function openDiagramModal(): void {
   document.addEventListener("keydown", onEscape);
 
   document.body.appendChild(overlayEl);
+
+  // Подгрузка и запуск скрипта диффа (соответствует diff.html + app-d.js)
+  const script = document.createElement("script");
+  script.src = browser.runtime.getURL("scripts/diff-app.js");
+  script.async = true;
+  overlayEl.appendChild(script);
 }
 
 export function isDiffPage(url: string): boolean {
