@@ -5,7 +5,25 @@
 
 import browser from "webextension-polyfill";
 import modalTemplate from "./diff-modal.html?raw";
+import {
+  fetchFileRaw,
+  fetchMergeRequest,
+  getHostFromUrl,
+  getTokenForHost,
+  isHostConfigured,
+  loadSettings,
+  parseMergeRequestDiffsUrl,
+} from "../lib";
 import { createIconButton } from "./utils";
+
+/** Глобальный объект APP, добавляемый скриптом diff-app.js */
+declare global {
+  interface Window {
+    APP?: {
+      loadSource: (panel: "left" | "right", payload: { xml: string }) => void;
+    };
+  }
+}
 
 /** Маска дифф-страницы MR: любой хост / путь / - / merge_requests / id / diffs */
 const DIFF_PAGE_PATH_REGEX = /\/-\/merge_requests\/\d+\/diffs\/?$/;
@@ -23,10 +41,42 @@ const MODAL_OVERLAY_SELECTOR = ".gl-bpmn-diff-modal-overlay";
 const MODAL_CLOSE_SELECTOR = ".gl-bpmn-diff-modal-close";
 
 /**
- * Открывает модальное окно: разметка из diff-modal.html, 80% размера окна,
- * закрытие по крестику, клику вне модалки и ESC.
+ * Возвращает третьего родителя элемента (или null).
  */
-function openDiagramModal(): void {
+function getThirdParent(el: HTMLElement): HTMLElement | null {
+  let current: HTMLElement | null = el;
+  for (let i = 0; i < 3 && current; i++) {
+    current = current.parentElement;
+  }
+  return current;
+}
+
+/**
+ * Ждёт появления глобального APP (после загрузки diff-app.js).
+ */
+function waitForAPP(timeoutMs = 10000): Promise<NonNullable<Window["APP"]>> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const check = (): void => {
+      if (window.APP) {
+        resolve(window.APP);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        reject(new Error("APP not loaded"));
+        return;
+      }
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
+/**
+ * Открывает модальное окно, загружает две версии файла (from/to branch) и передаёт их в APP.loadSource.
+ * @param diagramBtn — кнопка «Открыть диаграмму»; у её третьего родителя берётся data-path.
+ */
+function openDiagramModal(diagramBtn: HTMLElement): void {
   const wrap = document.createElement("div");
   wrap.innerHTML = modalTemplate;
   const overlay = wrap.querySelector<HTMLElement>(MODAL_OVERLAY_SELECTOR);
@@ -58,7 +108,81 @@ function openDiagramModal(): void {
   const script = document.createElement("script");
   script.src = browser.runtime.getURL("scripts/diff-app.js");
   script.async = true;
+  script.onload = (): void => {
+    loadAndShowDiff();
+  };
   overlayEl.appendChild(script);
+
+  async function loadAndShowDiff(): Promise<void> {
+    const thirdParent = getThirdParent(diagramBtn);
+    const filePath = thirdParent?.getAttribute("data-path") ?? null;
+    if (!filePath) {
+      console.error("[GitLab BPMN Viewer] data-path not found");
+      return;
+    }
+
+    const url = window.location.href;
+    const host = getHostFromUrl(url);
+    if (!host) {
+      return;
+    }
+    const settings = await loadSettings();
+    if (!isHostConfigured(settings, host)) {
+      return;
+    }
+    const token = getTokenForHost(settings, host);
+    if (!token) {
+      return;
+    }
+
+    const mrParams = parseMergeRequestDiffsUrl(url);
+    if (!mrParams) {
+      console.error("[GitLab BPMN Viewer] Could not parse MR URL");
+      return;
+    }
+
+    const origin = window.location.origin;
+
+    let from: string;
+    let to: string;
+    try {
+      const { source_branch, target_branch } = await fetchMergeRequest(
+        origin,
+        token,
+        mrParams.projectPath,
+        mrParams.mrIid
+      );
+      const [fromContent, toContent] = await Promise.all([
+        fetchFileRaw(
+          origin,
+          token,
+          mrParams.projectPath,
+          source_branch,
+          filePath
+        ),
+        fetchFileRaw(
+          origin,
+          token,
+          mrParams.projectPath,
+          target_branch,
+          filePath
+        ),
+      ]);
+      from = fromContent;
+      to = toContent;
+    } catch (err) {
+      console.error("[GitLab BPMN Viewer] Failed to fetch file versions:", err);
+      return;
+    }
+
+    try {
+      const APP = await waitForAPP();
+      APP.loadSource("left", { xml: to });
+      APP.loadSource("right", { xml: from });
+    } catch (err) {
+      console.error("[GitLab BPMN Viewer] APP.loadSource failed:", err);
+    }
+  }
 }
 
 export function isDiffPage(url: string): boolean {
@@ -88,7 +212,7 @@ function injectDiffDiagramButtons(): void {
       "Открыть диаграмму"
     );
     diagramBtn.addEventListener("click", () => {
-      openDiagramModal();
+      openDiagramModal(diagramBtn);
     });
 
     fileActions.insertBefore(diagramBtn, fileActions.firstChild);
