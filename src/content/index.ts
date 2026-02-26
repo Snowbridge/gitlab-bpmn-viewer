@@ -50,7 +50,6 @@ async function init(): Promise<void> {
 
   lastInitUrl = url;
   // TODO: 3.2 — контекстное меню
-  console.log("[GitLab BPMN Viewer] Content active for host:", host);
 }
 
 /** Интервал опроса URL (мс); срабатывает при переходе на blob без полной перезагрузки. */

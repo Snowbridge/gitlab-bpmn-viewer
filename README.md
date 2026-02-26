@@ -31,6 +31,20 @@ npm run build:firefox
 
 Артефакты: `dist/chrome/` или `dist/firefox/`.
 
+### Reproducible build (for reviewers, e.g. AMO)
+
+To produce the same extension package from source (required when using a bundler like Vite):
+
+1. **Environment:** Node.js 18 or newer. Use the same major version for reproducible builds.
+2. **Install dependencies (with lockfile):**  
+   `npm ci`  
+   (Use `npm ci` rather than `npm install` so dependency versions match `package-lock.json`.)
+3. **Build for Firefox:**  
+   `npm run build:firefox`
+4. **Output:** The built extension is in the `dist/firefox/` directory. The `manifest.json` there is the one shipped in the extension.
+
+For Chrome, use `npm run build:chrome`; output is in `dist/chrome/`.
+
 ## Установка расширения в браузере
 
 - **Chrome / Edge**: `chrome://extensions` → «Загрузить распакованное» → указать папку `dist/chrome`

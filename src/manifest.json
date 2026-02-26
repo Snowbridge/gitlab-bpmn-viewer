@@ -3,21 +3,26 @@
   "name": "GitLab BPMN Viewer",
   "version": "1.0.16",
   "description": "Визуализация BPMN-диаграмм в GitLab для code review и навигации по .bpmn файлам",
+  "homepage_url": "https://github.com/leo-sadovsky/gitlab-bpmn-viewer",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": [
-    "storage",
-    "contextMenus",
-    "activeTab",
-    "tabs"
-  ],
+  "permissions": ["storage", "contextMenus", "activeTab", "tabs"],
   "host_permissions": [
-    "<all_urls>"
+    "*://*/*/-/blob/*",
+    "*://*/*/-/tree/*",
+    "*://*/*/-/merge_requests/*",
+    "*://*/*/api/v4/*"
   ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "gitlab-bpmn-viewer@leo.sadovskie.ru",
+      "strict_min_version": "109.0"
+    }
+  },
   "background": {
     "service_worker": "src/background/index.ts"
   },
@@ -35,15 +40,31 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*/*/-/blob/*",
+        "*://*/*/-/tree/*",
+        "*://*/*/-/merge_requests/*"
+      ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "scripts/diff-app.js", "scripts/diff-apply-bridge.js", "*.woff", "*.woff2", "*.eot", "*.ttf"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "icons/*",
+        "scripts/diff-app.js",
+        "scripts/diff-apply-bridge.js",
+        "*.woff",
+        "*.woff2",
+        "*.eot",
+        "*.ttf"
+      ],
+      "matches": [
+        "*://*/*/-/blob/*",
+        "*://*/*/-/tree/*",
+        "*://*/*/-/merge_requests/*"
+      ]
     }
   ]
 }
