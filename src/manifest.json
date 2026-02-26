@@ -10,7 +10,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "contextMenus", "activeTab", "tabs"],
+  "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": [
     "*://*/*/-/blob/*",
     "*://*/*/-/tree/*",
@@ -60,11 +60,7 @@
         "*.eot",
         "*.ttf"
       ],
-      "matches": [
-        "*://*/*/-/blob/*",
-        "*://*/*/-/tree/*",
-        "*://*/*/-/merge_requests/*"
-      ]
+      "matches": ["<all_urls>"]
     }
   ]
 }

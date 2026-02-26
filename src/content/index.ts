@@ -49,7 +49,6 @@ async function init(): Promise<void> {
   }
 
   lastInitUrl = url;
-  // TODO: 3.2 — контекстное меню
 }
 
 /** Интервал опроса URL (мс); срабатывает при переходе на blob без полной перезагрузки. */

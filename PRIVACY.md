@@ -4,7 +4,7 @@
 
 ## Overview
 
-GitLab BPMN Viewer is a browser extension that adds BPMN diagram visualization to GitLab (blob view, merge request diffs, and context menus). This policy describes what data the extension handles and where it is stored or sent.
+GitLab BPMN Viewer is a browser extension that adds BPMN diagram visualization to GitLab (blob view and merge request diffs). This policy describes what data the extension handles and where it is stored or sent.
 
 ## Data the extension stores
 
