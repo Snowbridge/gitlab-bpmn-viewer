@@ -10,30 +10,30 @@ import {
   parseBlobUrl,
   parseMergeRequestDiffsUrl,
 } from "../lib";
-import { DEBUG_MESSAGE_TYPE } from "@/types";
+import { DEBUG_MESSAGE_TYPE, INIT_MESSAGE_TYPE } from "@/types";
 import { debug, writeDebugMessageToConsole } from "@/content/utils";
 
 const ICON_ENABLED = "/icons/icon16.png";
 const ICON_DISABLED = "/icons/icon16gray.png";
 
 /** Сообщение, которое background отправляет в content-script для инициализации. */
-const INIT_MESSAGE_TYPE = "gl-bpmn-viewer-init";
+
 
 async function updateIconForTab(tabId: number, url?: string): Promise<void> {
-  debug(`Updating icon for tab`, tabId, url);
+  debug(`updateIconForTab: Updating icon for tab`, tabId, url);
   let path = ICON_DISABLED;
   if (url && url.startsWith("http")) {
     const host = getHostFromUrl(url);
     const settings = await loadSettings();
     if (host && isHostConfigured(settings, host)) {
       path = ICON_ENABLED;
-      debug(`Host IS configured`);
+      debug(`updateIconForTab: Host IS configured`);
     } else
-      debug(`Host is NOT configured`);
+      debug(`updateIconForTab: Host is NOT configured`);
   }
 
   await browser.action.setIcon({ tabId, path });
-  debug(`The icon is set to ${path}`);
+  debug(`updateIconForTab: The icon is set to ${path}`);
 }
 
 /**
@@ -60,27 +60,27 @@ function shouldInitForUrl(url: string): boolean {
 
 // проверяет параметры табы и, если всё сходится, отправляет в нее сообщение "gl-bpmn-viewer-init"
 async function tryInitContentForTab(tabId: number, url?: string): Promise<void> {
-  debug(`Trying to initiate content-script for tab`, tabId, url);
+  debug(`tryInitContentForTab: Trying to initiate content-script for tab`, tabId, url);
 
   if (!url || !url.startsWith("http")) {
-    debug(`Url is not an http*-address`, url);
+    debug(`tryInitContentForTab: Url is not an http*-address`, url);
     return;
   }
 
   const host = getHostFromUrl(url);
   if (!host) {
-    debug(`Can't retrieve host from url`, url)
+    debug(`tryInitContentForTab: Can't retrieve host from url`, url)
     return;
   }
 
   const settings = await loadSettings();
   if (!isHostConfigured(settings, host)) {
-    debug(`Host is NOT configured in settings`, host);
+    debug(`tryInitContentForTab: Host is NOT configured in settings`, host);
     return;
   }
 
   if (!shouldInitForUrl(url)) {
-    debug(`That tab is not a diff- or blob-page`, url);
+    debug(`tryInitContentForTab: That tab is not a diff- or blob-page`, url);
     return;
   }
 
@@ -89,7 +89,7 @@ async function tryInitContentForTab(tabId: number, url?: string): Promise<void> 
       type: INIT_MESSAGE_TYPE,
       url,
     });
-    debug(`Init message is sent to content-script, tab[${tabId}], url[${url}]`);
+    debug(`tryInitContentForTab: Init message is sent to content-script, tab[${tabId}], url[${url}]`);
   } catch {
     // Вкладка без нашего content-script — игнорируем.
   }
@@ -102,7 +102,7 @@ async function updateActiveTabIcon(): Promise<void> {
       currentWindow: true,
     });
     if (tab?.id != null) {
-      debug(`Updating active tab`, tab.id, tab.url);
+      debug(`updateActiveTabIcon: Updating active tab`, tab.id, tab.url);
       await updateIconForTab(tab.id, tab.url);
       await tryInitContentForTab(tab.id, tab.url);
     }
@@ -171,7 +171,7 @@ browser.runtime.onInstalled.addListener(() => {
 
 browser.storage.onChanged.addListener((_changes, areaName) => {
   if (areaName === "local") {
-    debug(`Settings are changed`, areaName);
+    debug(`storage.onChanged: Settings are changed`, areaName);
     void updateActiveTabIcon();
   }
 });

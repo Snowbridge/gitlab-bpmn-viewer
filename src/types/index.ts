@@ -22,3 +22,4 @@ export enum ExecutionContext {
 }
 
 export const DEBUG_MESSAGE_TYPE = "gl-bpmn-viewer-debug-message";
+export const INIT_MESSAGE_TYPE = "gl-bpmn-viewer-init";

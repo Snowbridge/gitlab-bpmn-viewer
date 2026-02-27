@@ -16,6 +16,7 @@ import {
 import { initBlobPage } from "./blob-page";
 import { initDiffPage, isDiffPage } from "./diff-page";
 import { debug } from "./utils";
+import { INIT_MESSAGE_TYPE } from "@/types";
 
 /** URL страницы, для которой уже выполнялся init (избегаем двойного запуска). */
 let lastInitUrl: string | null = null;
@@ -25,13 +26,13 @@ async function init(overrideUrl?: string): Promise<void> {
   const url = overrideUrl ?? window.location.href;
   const host = getHostFromUrl(url);
   if (!host) {
-    debug("init: no host");
+    debug("init: can't get host from url");
     return;
   }
 
   const settings = await loadSettings();
   if (!isHostConfigured(settings, host)) {
-    debug("init: host is not configured", { host });
+    debug("init: host is not configured", host);
     return;
   }
 
@@ -75,8 +76,8 @@ void init();
 // Инициализация по сигналу от background-скрипта (SPA-навигация и т.п.).
 browser.runtime.onMessage.addListener((message: unknown) => {
   const typed = message as { type?: string; url?: string };
-  debug("content onMessage", typed);
-  if (typed.type === "gl-bpmn-viewer-init") {
+  if (typed.type === INIT_MESSAGE_TYPE) {
+    debug(`Received init-message from backend`, typed);
     void init(typed.url);
   }
 });
