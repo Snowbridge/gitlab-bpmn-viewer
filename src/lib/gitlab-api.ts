@@ -2,6 +2,8 @@
  * GitLab API — получение содержимого файлов репозитория
  */
 
+import { debug } from "@/content/utils";
+
 export interface BlobUrlParts {
   /** Путь проекта (например: group/subgroup/project) */
   projectPath: string;
@@ -16,6 +18,7 @@ export interface BlobUrlParts {
  * Маска: любой хост / путь_проекта / - / blob / ref / путь_файла.bpmn
  */
 export function parseBlobUrl(url: string): BlobUrlParts | null {
+  //debug(`parseBlobUrl`);
   try {
     const u = new URL(url);
     const match = u.pathname.match(/^\/?(.+?)\/-\/blob\/([^/]+)\/(.+\.bpmn)$/i);
@@ -26,14 +29,17 @@ export function parseBlobUrl(url: string): BlobUrlParts | null {
     if (!projectPath || !ref || !filePath) {
       return null;
     }
+    //debug(`parseBlobUrl - MATCH`);
     return {
       projectPath: projectPath.replace(/^\/+/, ""),
       ref: decodeURIComponent(ref),
       filePath: decodeURIComponent(filePath),
     };
   } catch {
-    return null;
+    /* nothing */
   }
+  //debug(`match not found`);
+  return null;
 }
 
 /**
@@ -44,6 +50,7 @@ export function parseMergeRequestDiffsUrl(url: string): {
   projectPath: string;
   mrIid: number;
 } | null {
+  //debug(`parseMergeRequestDiffsUrl`);
   try {
     const u = new URL(url);
     const match = u.pathname.match(
@@ -65,8 +72,10 @@ export function parseMergeRequestDiffsUrl(url: string): {
       mrIid,
     };
   } catch {
-    return null;
+    /* nothing */
   }
+  //debug(`match not found`);
+  return null;
 }
 
 /** Ссылки на коммиты диффа MR (не зависят от удалённых веток). */
@@ -94,6 +103,7 @@ export async function fetchMergeRequest(
   projectPath: string,
   mrIid: number
 ): Promise<MergeRequestInfo> {
+  //debug(`fetchMergeRequest`);
   const base = origin.replace(/\/$/, "");
   const url = `${base}/api/v4/projects/${encodeURIComponent(projectPath)}/merge_requests/${mrIid}`;
   const response = await fetch(url, {
@@ -121,6 +131,7 @@ export async function fetchMergeRequest(
       head_sha: data.diff_refs.head_sha,
     };
   }
+  //debug(`found start-head refs`, result);
   return result;
 }
 
@@ -135,6 +146,7 @@ export async function fetchFileRaw(
   ref: string,
   filePath: string
 ): Promise<string> {
+  //debug(`fetchFileRaw`);
   const base = origin.replace(/\/$/, "");
   // Путь проекта в URL не кодируем (слэши остаются сегментами пути). Кодируем только путь к файлу.
   const encodedFilePath = encodeURIComponent(filePath);
@@ -149,5 +161,6 @@ export async function fetchFileRaw(
       `GitLab API error: ${response.status} ${response.statusText}`
     );
   }
+  //debug(`file raw fetched`, url);
   return response.text();
 }

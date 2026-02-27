@@ -102,7 +102,11 @@ describe("loadSettings / saveSettings", () => {
     (browser.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     const result = await loadSettings();
-    expect(result).toEqual({ hosts: [] });
+    expect(result).toEqual({
+      hosts: [],
+      debugEnabled: false,
+      debugPrintStack: false,
+    });
   });
 
   it("loadSettings возвращает сохранённые данные", async () => {

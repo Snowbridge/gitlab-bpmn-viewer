@@ -9,4 +9,16 @@ export interface HostConfig {
 
 export type Settings = {
   hosts: HostConfig[];
+  /** Глобальный флаг включения отладочного вывода. */
+  debugEnabled?: boolean;
+  /** При включении добавляем stack trace в вывод debug. */
+  debugPrintStack?: boolean;
 };
+
+export enum ExecutionContext {
+  ServiceWorker,
+  ExtensionPage,
+  ContentScript
+}
+
+export const DEBUG_MESSAGE_TYPE = "gl-bpmn-viewer-debug-message";

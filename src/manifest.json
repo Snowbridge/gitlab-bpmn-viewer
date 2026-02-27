@@ -10,10 +10,9 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "activeTab", "tabs"],
+  "permissions": ["storage", "activeTab", "tabs", "webNavigation"],
   "host_permissions": [
     "*://*/*/-/blob/*",
-    "*://*/*/-/tree/*",
     "*://*/*/-/merge_requests/*",
     "*://*/*/api/v4/*"
   ],
@@ -42,7 +41,6 @@
     {
       "matches": [
         "*://*/*/-/blob/*",
-        "*://*/*/-/tree/*",
         "*://*/*/-/merge_requests/*"
       ],
       "js": ["src/content/index.ts"],

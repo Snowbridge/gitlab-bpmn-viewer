@@ -12,7 +12,7 @@ import {
   loadSettings,
   parseBlobUrl,
 } from "../lib";
-import { createIconButton } from "./utils";
+import { createIconButton, debug } from "./utils";
 
 const BLOB_VIEWER_SELECTOR =
   "#fileHolder .file-content.code.blob-content";
@@ -25,6 +25,7 @@ const POLL_INTERVAL_MS: number = 100;
 
 function waitForElement(selector: string): Promise<HTMLElement> {
   return new Promise((resolve, reject) => {
+    debug(`waitForElement: ${selector}`);
     const el = document.querySelector<HTMLElement>(selector);
     if (el) {
       resolve(el);
@@ -49,24 +50,30 @@ function waitForElement(selector: string): Promise<HTMLElement> {
  * Вызывать только если parseBlobUrl(url) и хост настроены (проверка в вызывающем коде).
  */
 export async function initBlobPage(): Promise<void> {
+  debug("initBlobPage");
+
   const url = window.location.href;
   const blobParts = parseBlobUrl(url);
   if (!blobParts) {
+    debug(`blobParts not found`);
     return;
   }
 
   const host = getHostFromUrl(url);
   if (!host) {
+    debug(`unable to extract host from url`);
     return;
   }
 
   const settings = await loadSettings();
   if (!isHostConfigured(settings, host)) {
+    debug(`host not configured`);
     return;
   }
 
   const token = getTokenForHost(settings, host);
   if (!token) {
+    debug(`token is not configured`);
     return;
   }
 
@@ -89,7 +96,7 @@ export async function initBlobPage(): Promise<void> {
       blobParts.filePath
     );
   } catch (err) {
-    console.error("[GitLab BPMN Viewer] Failed to fetch file:", err);
+    debug("Failed to fetch file:", err);
     throw err;
   }
 
@@ -139,8 +146,9 @@ export async function initBlobPage(): Promise<void> {
     await viewer.importXML(bpmnXml);
     const canvas = viewer.get("canvas") as { zoom: (mode: string) => void };
     canvas.zoom("fit-viewport");
+    debug(`BPMN rendered successfully`);
   } catch (err) {
-    console.error("[GitLab BPMN Viewer] Failed to render BPMN:", err);
+    debug("Failed to render BPMN:", err);
     target.innerHTML = originalContent;
     target.style.display = originalDisplay;
     throw err;

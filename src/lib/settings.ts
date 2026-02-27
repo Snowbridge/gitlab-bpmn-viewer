@@ -9,6 +9,8 @@ const STORAGE_KEY = "settings";
 
 const DEFAULT_SETTINGS: Settings = {
   hosts: [],
+  debugEnabled: false,
+  debugPrintStack: false,
 };
 
 /**
@@ -33,13 +35,18 @@ export async function loadSettings(): Promise<Settings> {
   if (!raw || !Array.isArray((raw as Settings).hosts)) {
     return { ...DEFAULT_SETTINGS };
   }
-  const hosts = ((raw as Settings).hosts as HostConfig[]).filter(
+  const rawSettings = raw as Settings;
+  const hosts = (rawSettings.hosts as HostConfig[]).filter(
     (h): h is HostConfig =>
       typeof h?.host === "string" &&
       h.host.length > 0 &&
       typeof h?.token === "string"
   );
-  return { hosts };
+  return {
+    hosts,
+    debugEnabled: Boolean(rawSettings.debugEnabled),
+    debugPrintStack: Boolean(rawSettings.debugPrintStack),
+  };
 }
 
 /**

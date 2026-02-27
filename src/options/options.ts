@@ -2,12 +2,14 @@
  * Страница настроек расширения
  */
 import { loadSettings, saveSettings } from "../lib/settings";
-import type { HostConfig } from "../types";
+import type { HostConfig, Settings } from "../types";
 
 const HOSTS_LIST_ID = "hosts-list";
 const ADD_HOST_ID = "add-host";
 const FORM_ID = "settings-form";
 const STATUS_ID = "status";
+const DEBUG_ENABLED_ID = "debug-enabled";
+const DEBUG_PRINT_STACK_ID = "debug-print-stack";
 
 function getEl<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -90,9 +92,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const hostsList = getEl<HTMLDivElement>(HOSTS_LIST_ID);
   const addBtn = getEl<HTMLButtonElement>(ADD_HOST_ID);
   const form = getEl<HTMLFormElement>(FORM_ID);
+  const debugEnabledCheckbox = getEl<HTMLInputElement>(DEBUG_ENABLED_ID);
+  const debugPrintStackCheckbox =
+    getEl<HTMLInputElement>(DEBUG_PRINT_STACK_ID);
 
-  const settings = await loadSettings();
+  const settings: Settings = await loadSettings();
   renderHosts(hostsList, settings.hosts);
+
+  debugEnabledCheckbox.checked = Boolean(settings.debugEnabled);
+  debugPrintStackCheckbox.checked = Boolean(settings.debugPrintStack);
 
   addBtn.addEventListener("click", () => {
     const newRow = createRow({ host: "", token: "" }, settings.hosts.length);
@@ -109,7 +117,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-      await saveSettings({ hosts });
+      const nextSettings: Settings = {
+        hosts,
+        debugEnabled: debugEnabledCheckbox.checked,
+        debugPrintStack: debugPrintStackCheckbox.checked,
+      };
+      await saveSettings(nextSettings);
       showStatus("Настройки сохранены.");
     } catch (err) {
       showStatus("Ошибка сохранения: " + String(err), true);

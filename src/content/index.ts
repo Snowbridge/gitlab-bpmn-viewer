@@ -5,6 +5,8 @@
 import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-js.css";
 
+import browser from "webextension-polyfill";
+
 import {
   getHostFromUrl,
   isHostConfigured,
@@ -13,88 +15,68 @@ import {
 } from "../lib";
 import { initBlobPage } from "./blob-page";
 import { initDiffPage, isDiffPage } from "./diff-page";
+import { debug } from "./utils";
 
 /** URL страницы, для которой уже выполнялся init (избегаем двойного запуска). */
 let lastInitUrl: string | null = null;
 
-async function init(): Promise<void> {
-  const url = window.location.href;
+async function init(overrideUrl?: string): Promise<void> {
+  debug("init for", overrideUrl);
+  const url = overrideUrl ?? window.location.href;
   const host = getHostFromUrl(url);
   if (!host) {
+    debug("init: no host");
     return;
   }
 
   const settings = await loadSettings();
   if (!isHostConfigured(settings, host)) {
+    debug("init: host is not configured", { host });
     return;
   }
 
   const blobParts = parseBlobUrl(url);
   if (blobParts) {
     if (lastInitUrl === url) {
+      debug("init: blobParts, already initialized for url", {
+        lastInitUrl,
+        url,
+      });
       return;
     }
     lastInitUrl = url;
-    await initBlobPage();
+    setTimeout(() => {
+      initBlobPage();
+    }, 1500); 
     return;
   }
 
   if (isDiffPage(url)) {
     if (lastInitUrl === url) {
+      debug("init: diffPage, already initialized for url", {
+        lastInitUrl,
+        url,
+      });
       return;
     }
     lastInitUrl = url;
-    initDiffPage();
+    setTimeout(() => {
+      initDiffPage();
+    }, 1500);    
     return;
   }
 
   lastInitUrl = url;
 }
 
-/** Интервал опроса URL (мс); срабатывает при переходе на blob без полной перезагрузки. */
-const URL_POLL_INTERVAL_MS = 350;
-let urlPollTimer: ReturnType<typeof setInterval> | null = null;
+// Первичная инициализация при полной загрузке контент-скрипта.
+void init();
 
-function startUrlPolling(): void {
-  if (urlPollTimer !== null) return;
-  urlPollTimer = setInterval(() => {
-    const url = window.location.href;
-    if (!parseBlobUrl(url)) return;
-    if (url === lastInitUrl) return;
-    const host = getHostFromUrl(url);
-    if (!host) return;
-    loadSettings().then((settings) => {
-      if (!isHostConfigured(settings, host)) return;
-      init();
-    });
-  }, URL_POLL_INTERVAL_MS);
-}
-
-/** Запуск init при навигации без полной перезагрузки. */
-function setupNavigationListeners(): void {
-  document.addEventListener("turbo:load", () => init());
-  window.addEventListener("popstate", () => init());
-
-  const runInitAfterUrlChange = (): void => {
-    setTimeout(() => init(), 200);
-  };
-  const origPushState = history.pushState;
-  const origReplaceState = history.replaceState;
-  history.pushState = function (
-    ...args: Parameters<typeof history.pushState>
-  ): void {
-    origPushState.apply(this, args);
-    runInitAfterUrlChange();
-  };
-  history.replaceState = function (
-    ...args: Parameters<typeof history.replaceState>
-  ): void {
-    origReplaceState.apply(this, args);
-    runInitAfterUrlChange();
-  };
-
-  startUrlPolling();
-}
-
-init();
-setupNavigationListeners();
+// Инициализация по сигналу от background-скрипта (SPA-навигация и т.п.).
+browser.runtime.onMessage.addListener((message: unknown) => {
+  const typed = message as { type?: string; url?: string };
+  debug("content onMessage", typed);
+  if (typed.type === "gl-bpmn-viewer-init") {
+    void init(typed.url);
+  }
+});

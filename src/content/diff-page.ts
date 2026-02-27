@@ -14,7 +14,7 @@ import {
   loadSettings,
   parseMergeRequestDiffsUrl,
 } from "../lib";
-import { createIconButton } from "./utils";
+import { createIconButton, debug } from "./utils";
 
 /** Маска дифф-страницы MR: любой хост / путь / - / merge_requests / id / diffs */
 const DIFF_PAGE_PATH_REGEX = /\/-\/merge_requests\/\d+\/diffs\/?$/;
@@ -56,6 +56,7 @@ function is404Error(err: unknown): boolean {
  * Показывает предупреждение пользователю (файл отсутствует в одной из веток).
  */
 function showWarning(message: string): void {
+  debug(`showWarning`);
   const box = document.createElement("div");
   box.setAttribute("role", "alert");
   box.className = "gl-bpmn-diff-warning";
@@ -77,7 +78,10 @@ function showWarning(message: string): void {
   ].join(";");
   box.textContent = message;
   document.body.appendChild(box);
-  setTimeout(() => box.remove(), 8000);
+  setTimeout(() => {
+    box.remove();
+    debug(`showWarning closed`)
+  }, 8000);
 }
 
 /**
@@ -85,6 +89,7 @@ function showWarning(message: string): void {
  * Внешний скрипт нужен из‑за CSP: inline script на странице блокируется.
  */
 function injectDiffApplyBridge(): void {
+  debug(`injectDiffApplyBridge`);
   const script = document.createElement("script");
   script.src = browser.runtime.getURL("scripts/diff-apply-bridge.js");
   ;(document.head || document.documentElement).appendChild(script);
@@ -104,6 +109,7 @@ async function fetchBothVersionsOrError(
   | { from: string; to: string }
   | { error: string }
 > {
+  debug(`fetchBothVersionsOrError`);
   const [sourceResult, targetResult] = await Promise.allSettled([
     fetchFileRaw(origin, token, projectPath, refSource, filePath),
     fetchFileRaw(origin, token, projectPath, refTarget, filePath),
@@ -130,6 +136,7 @@ async function fetchBothVersionsOrError(
     return { error: "Не удалось загрузить версию из целевой ветки." };
   }
 
+  debug(`Both versions are fetched successfully`);
   return {
     from: sourceResult.value,
     to: targetResult.value,
@@ -145,10 +152,12 @@ function openDiagramModalWithContent(
   from: string,
   to: string
 ): void {
+  debug(`openDiagramModalWithContent`);
   const wrap = document.createElement("div");
   wrap.innerHTML = modalTemplate;
   const overlay = wrap.querySelector<HTMLElement>(MODAL_OVERLAY_SELECTOR);
   if (!overlay) {
+    debug(`overlay not found`);
     return;
   }
   const overlayEl: HTMLElement = overlay;
@@ -178,17 +187,20 @@ function openDiagramModalWithContent(
   script.src = browser.runtime.getURL("scripts/diff-app.js");
   script.async = true;
   script.onload = (): void => {
+    debug(`scripts/diff-app.js is loaded`);
     document.dispatchEvent(
       new CustomEvent(DIFF_APPLY_EVENT, { detail: { from, to } })
     );
   };
   overlayEl.appendChild(script);
+  debug(`scripts/diff-app.js is appended`);
 }
 
 /**
  * По клику: проверяет наличие файла в обеих ветках, при 404 показывает предупреждение, иначе открывает модалку с диффом.
  */
 function onDiagramButtonClick(diagramBtn: HTMLElement): void {
+  debug(`onDiagramButtonClick`);
   (async () => {
     const thirdParent = getThirdParent(diagramBtn);
     const filePath = thirdParent?.getAttribute("data-path") ?? null;
@@ -204,6 +216,8 @@ function onDiagramButtonClick(diagramBtn: HTMLElement): void {
     if (!isHostConfigured(settings, host)) return;
     const token = getTokenForHost(settings, host);
     if (!token) return;
+
+    debug(`Host and token are configured`);
 
     const mrParams = parseMergeRequestDiffsUrl(url);
     if (!mrParams) {
@@ -259,9 +273,13 @@ export function isDiffPage(url: string): boolean {
  * Кнопка добавляется первым элементом в div.file-actions.
  */
 function injectDiffDiagramButtons(): void {
+  debug("injectDiffDiagramButtons");
+
   const panels = document.querySelectorAll<HTMLElement>(
     DIFF_BPMN_FILE_ACTIONS_SELECTOR
   );
+  
+  debug(`injectDiffDiagramButtons: panels found ${panels.length}`);
   for (const fileActions of panels) {
     if (fileActions.hasAttribute(DIFF_DIAGRAM_BTN_MARKER)) {
       continue;
@@ -277,6 +295,7 @@ function injectDiffDiagramButtons(): void {
     });
 
     fileActions.insertBefore(diagramBtn, fileActions.firstChild);
+    debug(`injectDiffDiagramButtons: button inserted`)
   }
 }
 
@@ -287,6 +306,8 @@ let diffObserver: MutationObserver | null = null;
  * Вызывать только если isDiffPage(url) и хост настроен (проверка в вызывающем коде).
  */
 export function initDiffPage(): void {
+  debug(`function initDiffPage()`);
+  
   injectDiffDiagramButtons();
 
   const diffsRoot = document.getElementById("diffs");
