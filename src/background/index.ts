@@ -20,17 +20,20 @@ const ICON_DISABLED = "/icons/icon16gray.png";
 const INIT_MESSAGE_TYPE = "gl-bpmn-viewer-init";
 
 async function updateIconForTab(tabId: number, url?: string): Promise<void> {
+  debug(`Updating icon for tab`, tabId, url);
   let path = ICON_DISABLED;
   if (url && url.startsWith("http")) {
     const host = getHostFromUrl(url);
     const settings = await loadSettings();
     if (host && isHostConfigured(settings, host)) {
       path = ICON_ENABLED;
-    }
+      debug(`Host IS configured`);
+    } else
+      debug(`Host is NOT configured`);
   }
 
-  debug(`updateIconForTab`, tabId, path);
   await browser.action.setIcon({ tabId, path });
+  debug(`The icon is set to ${path}`);
 }
 
 /**
@@ -55,32 +58,38 @@ function shouldInitForUrl(url: string): boolean {
   return false;
 }
 
+// проверяет параметры табы и, если всё сходится, отправляет в нее сообщение "gl-bpmn-viewer-init"
 async function tryInitContentForTab(tabId: number, url?: string): Promise<void> {
+  debug(`Trying to initiate content-script for tab`, tabId, url);
 
   if (!url || !url.startsWith("http")) {
+    debug(`Url is not an http*-address`, url);
     return;
   }
 
   const host = getHostFromUrl(url);
   if (!host) {
+    debug(`Can't retrieve host from url`, url)
     return;
   }
 
   const settings = await loadSettings();
   if (!isHostConfigured(settings, host)) {
+    debug(`Host is NOT configured in settings`, host);
     return;
   }
 
   if (!shouldInitForUrl(url)) {
+    debug(`That tab is not a diff- or blob-page`, url);
     return;
   }
 
   try {
-
     await browser.tabs.sendMessage(tabId, {
       type: INIT_MESSAGE_TYPE,
       url,
     });
+    debug(`Init message is sent to content-script, tab[${tabId}], url[${url}]`);
   } catch {
     // Вкладка без нашего content-script — игнорируем.
   }
@@ -93,6 +102,7 @@ async function updateActiveTabIcon(): Promise<void> {
       currentWindow: true,
     });
     if (tab?.id != null) {
+      debug(`Updating active tab`, tab.id, tab.url);
       await updateIconForTab(tab.id, tab.url);
       await tryInitContentForTab(tab.id, tab.url);
     }
@@ -101,11 +111,8 @@ async function updateActiveTabIcon(): Promise<void> {
   }
 }
 
-browser.runtime.onInstalled.addListener(() => {
-  void updateActiveTabIcon();
-});
-
 browser.tabs.onActivated.addListener((activeInfo) => {
+  debug(`tabs.onActivated is called`, activeInfo);
   browser.tabs.get(activeInfo.tabId).then(
     (tab) => {
       void updateIconForTab(activeInfo.tabId, tab.url);
@@ -121,45 +128,53 @@ browser.tabs.onActivated.addListener((activeInfo) => {
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url && tab.status === "complete") {
+    debug(`tabs.onUpdated is called`, tabId, changeInfo.url);
     void updateIconForTab(tabId, changeInfo.url);
     void tryInitContentForTab(tabId, changeInfo.url);
   }
 });
 
 // Отслеживаем SPA-навигацию (history.pushState/replaceState и подобное) через webNavigation.
+// Если разрешения нет, то придется нажимать F5 всякий раз, чтобы расширение сработало на blob- и diff-страницах
 if (browser.webNavigation) {
-  browser.webNavigation.onCommitted.addListener(
-    (details) => {
 
-      if (details.frameId !== 0 || !details.tabId || !details.url) {
-        return;
-      }
-      void tryInitContentForTab(details.tabId, details.url);
-    },
-    { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
-  );
+  const eventUrlFilters: browser.WebNavigation.EventUrlFilters = {
+    url: [
+      { urlContains: "/-/blob/" },
+      { urlContains: "/-/merge_requests/" }
+    ]
+  };
 
-  if (browser.webNavigation.onHistoryStateUpdated) {
-    browser.webNavigation.onHistoryStateUpdated.addListener(
-      (details) => {
-
+  [
+    { key: 'onCommitted', value: browser.webNavigation.onCommitted },
+    { key: 'onHistoryStateUpdated', value: browser.webNavigation.onHistoryStateUpdated }
+  ].forEach(kv => {
+    const event = kv.value;
+    if (event) {
+      event.addListener((details) => {
         if (details.frameId !== 0 || !details.tabId || !details.url) {
           return;
         }
         void tryInitContentForTab(details.tabId, details.url);
-      },
-      { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
-    );
-  }
+      }, eventUrlFilters)
+    } else {
+      debug(`Event is not supported ${kv.key}`);
+    }
+  });
+} else {
+  debug(`webNavigation is not available`);
 }
+
+browser.runtime.onInstalled.addListener(() => {
+  void updateActiveTabIcon();
+});
 
 browser.storage.onChanged.addListener((_changes, areaName) => {
   if (areaName === "local") {
+    debug(`Settings are changed`, areaName);
     void updateActiveTabIcon();
   }
 });
-
-void updateActiveTabIcon();
 
 browser.runtime.onMessage.addListener(async (message: unknown) => {
   const typed = message as {
@@ -173,5 +188,7 @@ browser.runtime.onMessage.addListener(async (message: unknown) => {
   if (typed.type !== DEBUG_MESSAGE_TYPE || !typed.payload) {
     return;
   }
-  writeDebugMessageToConsole(typed.payload.timestamp,typed.payload.data, typed.payload.stack);
+  writeDebugMessageToConsole(typed.payload.timestamp, typed.payload.data, typed.payload.stack);
 });
+
+void updateActiveTabIcon();

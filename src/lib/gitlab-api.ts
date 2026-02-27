@@ -18,7 +18,7 @@ export interface BlobUrlParts {
  * Маска: любой хост / путь_проекта / - / blob / ref / путь_файла.bpmn
  */
 export function parseBlobUrl(url: string): BlobUrlParts | null {
-  //debug(`parseBlobUrl`);
+  debug(`Checking if url is a blob-page`, url);
   try {
     const u = new URL(url);
     const match = u.pathname.match(/^\/?(.+?)\/-\/blob\/([^/]+)\/(.+\.bpmn)$/i);
@@ -29,7 +29,7 @@ export function parseBlobUrl(url: string): BlobUrlParts | null {
     if (!projectPath || !ref || !filePath) {
       return null;
     }
-    //debug(`parseBlobUrl - MATCH`);
+    debug(`url is a blob-page`, url);
     return {
       projectPath: projectPath.replace(/^\/+/, ""),
       ref: decodeURIComponent(ref),
@@ -38,7 +38,7 @@ export function parseBlobUrl(url: string): BlobUrlParts | null {
   } catch {
     /* nothing */
   }
-  //debug(`match not found`);
+  debug(`url is NOT a blob-page`, url);
   return null;
 }
 
@@ -50,27 +50,32 @@ export function parseMergeRequestDiffsUrl(url: string): {
   projectPath: string;
   mrIid: number;
 } | null {
-  //debug(`parseMergeRequestDiffsUrl`);
+  debug(`Parsing a merge request page`, url);
   try {
     const u = new URL(url);
     const match = u.pathname.match(
       /^\/?(.+?)\/-\/merge_requests\/(\d+)\/diffs\/?$/i
     );
     if (!match) {
+      debug(`Url is NOT a merge request page`, url);
       return null;
     }
     const [, projectPath, iidStr] = match;
     if (!projectPath || !iidStr) {
+      debug(`Unable to retrieve projectPath and mr id`);
       return null;
     }
     const mrIid = parseInt(iidStr, 10);
     if (Number.isNaN(mrIid)) {
+      debug(`Mr id is NaN`);
       return null;
     }
-    return {
+    const mrInfo = {
       projectPath: projectPath.replace(/^\/+/, ""),
       mrIid,
     };
+    debug(`Diff-page parsed successfully`, mrInfo);
+    return mrInfo;
   } catch {
     /* nothing */
   }
@@ -103,9 +108,10 @@ export async function fetchMergeRequest(
   projectPath: string,
   mrIid: number
 ): Promise<MergeRequestInfo> {
-  //debug(`fetchMergeRequest`);
   const base = origin.replace(/\/$/, "");
   const url = `${base}/api/v4/projects/${encodeURIComponent(projectPath)}/merge_requests/${mrIid}`;
+  debug(`Fetching merge request`, url);
+
   const response = await fetch(url, {
     headers: {
       "PRIVATE-TOKEN": token,
@@ -131,7 +137,7 @@ export async function fetchMergeRequest(
       head_sha: data.diff_refs.head_sha,
     };
   }
-  //debug(`found start-head refs`, result);
+  debug(`Start-end refs retrieved successfully`, result);
   return result;
 }
 
@@ -146,11 +152,13 @@ export async function fetchFileRaw(
   ref: string,
   filePath: string
 ): Promise<string> {
-  //debug(`fetchFileRaw`);
   const base = origin.replace(/\/$/, "");
   // Путь проекта в URL не кодируем (слэши остаются сегментами пути). Кодируем только путь к файлу.
   const encodedFilePath = encodeURIComponent(filePath);
   const url = `${base}/api/v4/projects/${encodeURIComponent(projectPath)}/repository/files/${encodedFilePath}/raw?ref=${encodeURIComponent(ref)}`;
+  
+  debug(`Fetching raw file`, url);
+
   const response = await fetch(url, {
     headers: {
       "PRIVATE-TOKEN": token,
@@ -161,6 +169,6 @@ export async function fetchFileRaw(
       `GitLab API error: ${response.status} ${response.statusText}`
     );
   }
-  //debug(`file raw fetched`, url);
+  debug(`Raw file is fetched`, url);
   return response.text();
 }
