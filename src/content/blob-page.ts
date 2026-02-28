@@ -1,3 +1,5 @@
+import config from "../lib/configuration";
+
 /**
  * Логика blob-страницы: отображение BPMN-диаграммы вместо исходного кода (требование 3.2).
  * Ответственность: только страницы просмотра файла (маска -/blob/ ref / путь к .bpmn).
@@ -6,10 +8,6 @@
 import NavigatedViewer from "bpmn-js/lib/NavigatedViewer";
 import {
   fetchFileRaw,
-  getHostFromUrl,
-  getTokenForHost,
-  isHostConfigured,
-  loadSettings,
   parseBlobUrl,
 } from "../lib";
 import { createIconButton, debug } from "./utils";
@@ -59,19 +57,12 @@ export async function initBlobPage(): Promise<void> {
     return;
   }
 
-  const host = getHostFromUrl(url);
-  if (!host) {
-    debug(`unable to extract host from url`);
+  if(!config.isHostConfigured(url)){
+    debug(`host is NOT configured`, url);
     return;
   }
 
-  const settings = await loadSettings();
-  if (!isHostConfigured(settings, host)) {
-    debug(`host not configured`);
-    return;
-  }
-
-  const token = getTokenForHost(settings, host);
+  const token = config.getToken(url);
   if (!token) {
     debug(`token is not configured`);
     return;

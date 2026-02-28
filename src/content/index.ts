@@ -6,11 +6,9 @@ import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-js.css";
 
 import browser from "webextension-polyfill";
+import config from "../lib/configuration";
 
 import {
-  getHostFromUrl,
-  isHostConfigured,
-  loadSettings,
   parseBlobUrl,
 } from "../lib";
 import { initBlobPage } from "./blob-page";
@@ -23,16 +21,11 @@ let lastInitUrl: string | null = null;
 
 async function init(overrideUrl?: string): Promise<void> {
   debug("init for", overrideUrl);
+  await config.init();
   const url = overrideUrl ?? window.location.href;
-  const host = getHostFromUrl(url);
-  if (!host) {
-    debug("init: can't get host from url");
-    return;
-  }
 
-  const settings = await loadSettings();
-  if (!isHostConfigured(settings, host)) {
-    debug("init: host is not configured", host);
+  if(!config.isHostConfigured(url)) {
+    debug("init: host is not configured", url);
     return;
   }
 

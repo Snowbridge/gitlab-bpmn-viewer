@@ -1,8 +1,8 @@
 /**
  * Страница настроек расширения
  */
-import { loadSettings, saveSettings } from "../lib/settings";
-import type { HostConfig, Settings } from "../types";
+import config from "../lib/configuration";
+import type { HostConfig } from "../types";
 
 const HOSTS_LIST_ID = "hosts-list";
 const ADD_HOST_ID = "add-host";
@@ -89,6 +89,7 @@ function showStatus(message: string, isError = false): void {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await config.init();
   const hostsList = getEl<HTMLDivElement>(HOSTS_LIST_ID);
   const addBtn = getEl<HTMLButtonElement>(ADD_HOST_ID);
   const form = getEl<HTMLFormElement>(FORM_ID);
@@ -96,14 +97,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const debugPrintStackCheckbox =
     getEl<HTMLInputElement>(DEBUG_PRINT_STACK_ID);
 
-  const settings: Settings = await loadSettings();
-  renderHosts(hostsList, settings.hosts);
+  const configuredHosts = config.getHosts();
+  renderHosts(hostsList, configuredHosts);
 
-  debugEnabledCheckbox.checked = Boolean(settings.debugEnabled);
-  debugPrintStackCheckbox.checked = Boolean(settings.debugPrintStack);
+  debugEnabledCheckbox.checked = config.isDebugEnabled();
+  debugPrintStackCheckbox.checked = config.isDebugStackIncluded();
 
   addBtn.addEventListener("click", () => {
-    const newRow = createRow({ host: "", token: "" }, settings.hosts.length);
+    const newRow = createRow({ host: "", token: "" }, configuredHosts.length);
     hostsList.appendChild(newRow);
   });
 
@@ -117,12 +118,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-      const nextSettings: Settings = {
-        hosts,
-        debugEnabled: debugEnabledCheckbox.checked,
-        debugPrintStack: debugPrintStackCheckbox.checked,
-      };
-      await saveSettings(nextSettings);
+      await config.update(hosts, debugEnabledCheckbox.checked, debugPrintStackCheckbox.checked)
       showStatus("Настройки сохранены.");
     } catch (err) {
       showStatus("Ошибка сохранения: " + String(err), true);

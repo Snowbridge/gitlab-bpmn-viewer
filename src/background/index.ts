@@ -2,11 +2,8 @@
  * Background script (Service Worker) — точка входа для MV3
  */
 import browser from "webextension-polyfill";
-
+import config from "../lib/configuration";
 import {
-  getHostFromUrl,
-  isHostConfigured,
-  loadSettings,
   parseBlobUrl,
   parseMergeRequestDiffsUrl,
 } from "../lib";
@@ -20,17 +17,15 @@ const ICON_DISABLED = "/icons/icon16gray.png";
 
 
 async function updateIconForTab(tabId: number, url?: string): Promise<void> {
+  await config.init();
   debug(`updateIconForTab: Updating icon for tab`, tabId, url);
   let path = ICON_DISABLED;
-  if (url && url.startsWith("http")) {
-    const host = getHostFromUrl(url);
-    const settings = await loadSettings();
-    if (host && isHostConfigured(settings, host)) {
-      path = ICON_ENABLED;
-      debug(`updateIconForTab: Host IS configured`);
-    } else
-      debug(`updateIconForTab: Host is NOT configured`);
-  }
+
+  const isHostConfigured = url && config.isHostConfigured(url);
+  debug(`updateIconForTab: Host ${isHostConfigured ? 'IS' : 'is NOT'} configured`);
+
+  if (isHostConfigured)
+    path = ICON_ENABLED;
 
   await browser.action.setIcon({ tabId, path });
   debug(`updateIconForTab: The icon is set to ${path}`);
@@ -60,22 +55,11 @@ function shouldInitForUrl(url: string): boolean {
 
 // проверяет параметры табы и, если всё сходится, отправляет в нее сообщение "gl-bpmn-viewer-init"
 async function tryInitContentForTab(tabId: number, url?: string): Promise<void> {
+  await config.init();
   debug(`tryInitContentForTab: Trying to initiate content-script for tab`, tabId, url);
 
-  if (!url || !url.startsWith("http")) {
-    debug(`tryInitContentForTab: Url is not an http*-address`, url);
-    return;
-  }
-
-  const host = getHostFromUrl(url);
-  if (!host) {
-    debug(`tryInitContentForTab: Can't retrieve host from url`, url)
-    return;
-  }
-
-  const settings = await loadSettings();
-  if (!isHostConfigured(settings, host)) {
-    debug(`tryInitContentForTab: Host is NOT configured in settings`, host);
+  if (!url || !config.isHostConfigured(url)) {
+    debug(`tryInitContentForTab: Host is NOT configured in settings`, url);
     return;
   }
 

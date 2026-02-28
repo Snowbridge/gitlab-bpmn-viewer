@@ -1,9 +1,9 @@
 /**
  * Общие утилиты для content-скриптов (blob, diff и т.д.)
  */
-import { loadSettings } from "@/lib";
+import config from "../lib/configuration";
 import browser from "webextension-polyfill";
-import { DEBUG_MESSAGE_TYPE, ExecutionContext, Settings } from "../types";
+import { DEBUG_MESSAGE_TYPE, ExecutionContext } from "../types";
 
 export function createIconButton(
   iconPath: string,
@@ -39,36 +39,30 @@ export function getExecutionContext(): ExecutionContext {
  */
 export function debug(...data: any[]): void {
   const timestamp = (new Date()).toISOString();
-  loadSettings()
-    .then((settings: Settings) => {
-      if (!settings.debugEnabled)
-        return;
+  if(!config.isDebugEnabled())
+    return;
 
-      let stack = undefined;
-      if (settings.debugPrintStack)
-        stack = (new Error).stack?.split('\n');
+  let stack = undefined;
+  if (config.isDebugStackIncluded())
+    stack = (new Error).stack?.split('\n');
 
-      // если это на бэкэнде, то сразу в консоль
-      if (getExecutionContext() == ExecutionContext.ServiceWorker) {
-        writeDebugMessageToConsole(timestamp, data, stack);
-      } else { // иначе отправляем на бэкэнд
-        browser.runtime
-          .sendMessage({
-            type: DEBUG_MESSAGE_TYPE,
-            payload: {
-              data: data,
-              timestamp: new Date().toISOString(),
-              stack: (new Error()).stack?.split('\n')
-            },
-          })
-          .catch((error) => {
-            writeDebugMessageToConsole(timestamp, [`Debug message sending failed`, error, data], error?.stack.split('\n'));
-          })
-      }
-    })
-    .catch((error) => {
-      writeDebugMessageToConsole(timestamp, [`Unable to retrieve the extension settings`, error, ...data], error?.stack.split('\n'));
-    })
+  // если это на бэкэнде, то сразу в консоль
+  if (getExecutionContext() == ExecutionContext.ServiceWorker) {
+    writeDebugMessageToConsole(timestamp, data, stack);
+  } else { // иначе отправляем на бэкэнд
+    browser.runtime
+      .sendMessage({
+        type: DEBUG_MESSAGE_TYPE,
+        payload: {
+          data: data,
+          timestamp: new Date().toISOString(),
+          stack: (new Error()).stack?.split('\n')
+        },
+      })
+      .catch((error) => {
+        writeDebugMessageToConsole(timestamp, [`Debug message sending failed`, error, data], error?.stack.split('\n'));
+      })
+  }
 }
 
 // в дебаг лог пишет именно эта приватная функция, а публичная - только обёртка

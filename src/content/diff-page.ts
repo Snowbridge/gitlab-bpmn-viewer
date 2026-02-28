@@ -4,14 +4,12 @@
  */
 
 import browser from "webextension-polyfill";
+import config from "../lib/configuration";
+
 import modalTemplate from "./diff-modal.html?raw";
 import {
   fetchFileRaw,
   fetchMergeRequest,
-  getHostFromUrl,
-  getTokenForHost,
-  isHostConfigured,
-  loadSettings,
   parseMergeRequestDiffsUrl,
 } from "../lib";
 import { createIconButton, debug } from "./utils";
@@ -92,7 +90,7 @@ function injectDiffApplyBridge(): void {
   debug(`injectDiffApplyBridge`);
   const script = document.createElement("script");
   script.src = browser.runtime.getURL("scripts/diff-apply-bridge.js");
-  ;(document.head || document.documentElement).appendChild(script);
+  ; (document.head || document.documentElement).appendChild(script);
 }
 
 /**
@@ -205,17 +203,17 @@ function onDiagramButtonClick(diagramBtn: HTMLElement): void {
     const thirdParent = getThirdParent(diagramBtn);
     const filePath = thirdParent?.getAttribute("data-path") ?? null;
     if (!filePath) {
-      console.error("[GitLab BPMN Viewer] data-path not found");
+      debug("Element with 'data-path' attribute is NOT found");
       return;
     }
 
     const url = window.location.href;
-    const host = getHostFromUrl(url);
-    if (!host) return;
-    const settings = await loadSettings();
-    if (!isHostConfigured(settings, host)) return;
-    const token = getTokenForHost(settings, host);
-    if (!token) return;
+    if (!config.isHostConfigured(url))
+      return;
+
+    const token = config.getToken(url);
+    if (!token)
+      return;
 
     debug(`Host and token are configured`);
 
@@ -278,7 +276,7 @@ function injectDiffDiagramButtons(): void {
   const panels = document.querySelectorAll<HTMLElement>(
     DIFF_BPMN_FILE_ACTIONS_SELECTOR
   );
-  
+
   debug(`injectDiffDiagramButtons: panels found ${panels.length}`);
   for (const fileActions of panels) {
     if (fileActions.hasAttribute(DIFF_DIAGRAM_BTN_MARKER)) {
@@ -307,7 +305,7 @@ let diffObserver: MutationObserver | null = null;
  */
 export function initDiffPage(): void {
   debug(`function initDiffPage()`);
-  
+
   injectDiffDiagramButtons();
 
   const diffsRoot = document.getElementById("diffs");
