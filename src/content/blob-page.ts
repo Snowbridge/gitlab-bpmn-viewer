@@ -12,6 +12,20 @@ import {
 } from "../lib";
 import { createIconButton, debug } from "./utils";
 
+const MESSAGE_ID = `gl-bpmn-viewer-content-init-blob`;
+const PAGE_PATH_REGEX = /^\/?(.+?)\/-\/blob\/([^/]+)\/(.+\.bpmn).*$/i;
+
+export const messageMapEntry = {
+  predicate: (url: string) => {
+    try {
+      return PAGE_PATH_REGEX.test(url);
+    } catch {
+      return false;
+    }
+  },
+  message: MESSAGE_ID
+}
+
 const BLOB_VIEWER_SELECTOR =
   "#fileHolder .file-content.code.blob-content";
 

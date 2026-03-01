@@ -1,31 +1,42 @@
-import { debug } from "@/content/utils";
+import { Logger } from "@/background/logger";
 import { HostConfig } from "@/types";
 import browser from "webextension-polyfill";
 
-class Configuration {
+export class Configuration {
 
+    private logger: Logger;
     private STORAGE_KEY = "gl-bpmn-viewer-configuration";
-    private loadPromise: Promise<void> | null = null;
+    private loadPromise: Promise<Configuration> | null = null;
     private hosts: Array<HostConfig> = [];
     private debugEnabled = false;
     private debugStackIncluded = false;
 
-    async init(): Promise<void> {
+    /**
+     * Подписывается на события, загружает настройки из хранилища
+     * @returns 
+     */
+    async init(): Promise<Configuration> {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        const self = this;
+        browser.storage.onChanged.addListener((_changes, areaName) => {
+            if (areaName === "local") {
+                this.logger.debug(`Settings are changed`, areaName, _changes);
+                self.loadFromStorage();
+            }
+        });
+
+        browser.runtime.onInstalled.addListener(() => {
+            self.loadFromStorage();
+        });
+
         if (this.loadPromise === null) {
             this.loadPromise = this.loadFromStorage();
         }
         return this.loadPromise;
     }
 
-    constructor() {
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
-        const self = this;
-        browser.storage.onChanged.addListener((_changes, areaName) => {
-            if (areaName === "local") {
-                debug(`Configuration::storage.onChanged: Settings are changed`, areaName);
-                self.loadFromStorage();
-            }
-        });
+    constructor(logger: Logger) {
+        this.logger = logger;
     }
 
     private async loadFromStorage() {
@@ -47,8 +58,12 @@ class Configuration {
         if (Object.prototype.hasOwnProperty.call(raw, "debugStackIncluded"))
             this.debugStackIncluded = raw.debugStackIncluded as boolean | false;
 
+        this.logger.setDebugEnabled(this.debugEnabled);
+        this.logger.setDebugStackIncluded(this.debugStackIncluded);
+
         if (!this.hosts.length)
-            debug(`Hosts are not set up properly in settings, the extension is disabled`);
+            this.logger.debug(`Hosts are not set up properly in settings, the extension is disabled`);
+        return this;
     }
 
     async update(hosts: Array<HostConfig>, isDebugEnabled: boolean, isDebugStackIncluded: boolean) {
@@ -93,7 +108,7 @@ class Configuration {
             const host = urlFromString(url).host;
             return this.hosts.some(it => it.host == host)
         } catch (error) {
-            debug(`Unable to parse url`, url, error);
+            this.logger.debug(`Unable to parse url`, url, error);
         }
         return false;
     }
@@ -107,6 +122,10 @@ class Configuration {
     getHosts(): Array<HostConfig> {
         return this.hosts.map(it => { return { host: it.host, token: it.token } as HostConfig });
     }
+
+    debug(message: string, ...data: any[]): void {
+        this.logger.debug(message, data);
+    }
 }
 
 function urlFromString(strUrl: string): URL {
@@ -114,7 +133,3 @@ function urlFromString(strUrl: string): URL {
         strUrl = `proto://${strUrl}`;
     return new URL(strUrl);
 }
-
-const configInstance = new Configuration();
-/** Дождаться перед первым использованием конфига. Потребители делают await configReady в начале своей инициализации. */
-export default configInstance;

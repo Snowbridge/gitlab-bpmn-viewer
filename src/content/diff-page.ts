@@ -10,12 +10,26 @@ import modalTemplate from "./diff-modal.html?raw";
 import {
   fetchFileRaw,
   fetchMergeRequest,
+
   parseMergeRequestDiffsUrl,
 } from "../lib";
 import { createIconButton, debug } from "./utils";
 
 /** Маска дифф-страницы MR: любой хост / путь / - / merge_requests / id / diffs */
-const DIFF_PAGE_PATH_REGEX = /\/-\/merge_requests\/\d+\/diffs\/?$/;
+const DIFF_PAGE_PATH_REGEX = /^\/?(.+?)\/-\/merge_requests\/(\d+)\/diffs\/?$/;
+
+const MESSAGE_ID = `gl-bpmn-viewer-content-init-diff`;
+
+export const messageMapEntry = {
+  predicate: (url: string) => {
+    try {
+      return DIFF_PAGE_PATH_REGEX.test(url);
+    } catch {
+      return false;
+    }
+  },
+  message: MESSAGE_ID
+}
 
 /** Панели инструментов просмотра BPMN на дифф-странице (фича 3.4) */
 const DIFF_BPMN_FILE_ACTIONS_SELECTOR =

@@ -38,13 +38,13 @@ export function getExecutionContext(): ExecutionContext {
  * @param data - данные, которые нужно вывести в консоль
  */
 export function debug(...data: any[]): void {
-  const timestamp = (new Date()).toISOString();
   if(!config.isDebugEnabled())
     return;
+  const timestamp = (new Date()).toISOString();
 
   let stack = undefined;
   if (config.isDebugStackIncluded())
-    stack = (new Error).stack?.split('\n');
+    stack = (new Error).stack?.split('\n').slice(2,5);
 
   // если это на бэкэнде, то сразу в консоль
   if (getExecutionContext() == ExecutionContext.ServiceWorker) {
@@ -67,5 +67,5 @@ export function debug(...data: any[]): void {
 
 // в дебаг лог пишет именно эта приватная функция, а публичная - только обёртка
 export function writeDebugMessageToConsole(timestamp: string, data: any[], stack?: string[]) {
-  console.log(`[gl-bpmn-viewer] DEBUG ${timestamp}`, data, stack?.slice(1).join('\n'));
+  console.log(`[gl-bpmn-viewer] DEBUG ${timestamp}`, ...data, stack?.slice(1).join('\n'));
 }
