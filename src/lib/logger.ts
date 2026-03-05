@@ -33,10 +33,8 @@ export function debug(message: string, ...data: any[]): void {
                 message: message,
                 timestamp: timestamp,
                 logger: stack.at(1)?.trim() ?? "<unknown>", // строчка кода, из которой вызван debug()
+                data: data
             };
-
-            if (data && (!Array.isArray(data) || data.length > 0))
-                payload.data = data;
 
             if (config.isDebugStackIncluded())
                 payload.stack = stack.slice(2, 5) ?? ["<unknown>"];
@@ -55,10 +53,7 @@ export function debug(message: string, ...data: any[]): void {
  * @param stack - stack
  */
 function log(message: string, timestamp: string, logger?: string, data?: any[], stack?: string[]) {
-    const payload: any[] = [message, timestamp, logger ?? "<unknown>"];
-
-    if (data)
-        payload.concat([...data]);
+    const payload: any[] = [message, timestamp, logger ?? "<unknown>", ...data ?? []];
 
     if (stack)
         payload.push(stack);

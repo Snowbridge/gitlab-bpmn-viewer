@@ -1,6 +1,6 @@
 {
   "name": "gitlab-bpmn-viewer",
-  "version": "2.0.21",
+  "version": "2.0.22",
   "description": "Расширение для визуализации BPMN-диаграмм в GitLab",
   "type": "module",
   "scripts": {

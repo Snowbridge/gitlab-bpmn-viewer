@@ -37,14 +37,24 @@ export class BaseConfig {
                 browser.storage.local
                     .get(this.STORAGE_KEY)
                     .then((rawStorageData) => {
-                        const settings = rawStorageData[this.STORAGE_KEY] as StoredSettings;
-                        let hosts: Array<HostConfig> = [];
-                        if (settings.hosts && Array.isArray(settings.hosts)) {
-                            hosts = (settings.hosts)
-                                .filter(it => it.host && it.token); // both fields must be present
-                        }
+                        const rawSettings = rawStorageData[this.STORAGE_KEY] as Partial<StoredSettings> | undefined;
 
-                        this.update(hosts, settings.debugEnabled, settings.debugStackIncluded)
+                        const rawHosts = Array.isArray(rawSettings?.hosts) ? rawSettings.hosts : [];
+                        const hosts: Array<HostConfig> = rawHosts
+                            .filter((it): it is HostConfig => !!it && typeof it.host === "string" && typeof it.token === "string")
+                            .filter(it => it.host && it.token); // both fields must be present
+
+                        const debugEnabled =
+                            typeof rawSettings?.debugEnabled === "boolean"
+                                ? rawSettings.debugEnabled
+                                : false;
+
+                        const debugStackIncluded =
+                            typeof rawSettings?.debugStackIncluded === "boolean"
+                                ? rawSettings.debugStackIncluded
+                                : false;
+
+                        this.update(hosts, debugEnabled, debugStackIncluded);
 
                         console.log(`Settings loaded from local storage successfully`);
                         resolve(this);

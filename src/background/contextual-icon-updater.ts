@@ -20,9 +20,9 @@ export class ContextualIconUpdater {
         const self = this;
         if(!browser.tabs.onUpdated.hasListener(emptyWatchdogHandler)){
             browser.tabs.onUpdated.addListener(emptyWatchdogHandler);
-            browser.tabs.onUpdated.addListener(async (tabId: number, changeInfo: browser.Tabs.OnUpdatedChangeInfoType, _tab: browser.Tabs.Tab) => {
-                debug(`ContextualIconUpdater.onUpdated is called`, tabId, changeInfo.url);
-                void await self.updateIconForTab(tabId, changeInfo.url);
+            browser.tabs.onUpdated.addListener(async (tabId: number, changeInfo: browser.Tabs.OnUpdatedChangeInfoType, tab: browser.Tabs.Tab) => {
+                debug(`ContextualIconUpdater.onUpdated is called`, tabId, tab.url);
+                void await self.updateIconForTab(tabId, tab.url);
             });
         }
             
@@ -63,7 +63,7 @@ export class ContextualIconUpdater {
         let path = ICON_DISABLED;
 
         const isHostConfigured = url && this.config.isHostConfigured(url);
-        debug(`Host ${isHostConfigured ? 'IS' : 'is NOT'} configured`);
+        debug(`Host ${isHostConfigured ? 'IS' : 'is NOT'} configured fo url ${url}`);
 
         if (isHostConfigured)
             path = ICON_ENABLED;

@@ -88,7 +88,7 @@ function showStatus(message: string, isError = false): void {
   }
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+async function init() {
   const config = new BaseConfig();
   await config.load();
 
@@ -127,4 +127,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       showStatus("Ошибка сохранения: " + String(err), true);
     }
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    void init();
+  });
+} else {
+  void init();
+}

@@ -9,7 +9,7 @@ const WATCHDOG_FLAG = `gl-bpmn-viewer-is-injected` as const;
 const SELECTOR_FILE_ACTIONS = `div.file-actions` as const;
 const SELECTOR_BUTTONS = `#fileHolder div.file-actions > :last-child` as const;
 const SELECTOR_FILE_CONTENT = `#fileHolder .file-content.code.blob-content` as const;
-const SELECTOR_REF_DROPDOWN = `#dropdown-toggle-btn-33 > span > span` as const;
+const SELECTOR_REF_DROPDOWN = `div.tree-ref-holder > div.ref-selector > button > span > span` as const;
 
 const config = new ForegroundConfig();
 config.load();
