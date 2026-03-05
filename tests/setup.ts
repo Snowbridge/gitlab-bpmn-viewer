@@ -1,3 +1,3 @@
 /**
- * Глобальная настройка тестов (пока пустая)
+ * Global tests configuration (currently empty)
  */

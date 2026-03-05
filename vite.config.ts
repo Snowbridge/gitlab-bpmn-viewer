@@ -10,7 +10,7 @@ const pkg = JSON.parse(
   readFileSync(resolve(__dirname, "package.json"), "utf-8")
 ) as { version: string };
 
-/** Подставляет версию из package.json в собранный манифест (после записи всех файлов). */
+/** Injects version from package.json into the built manifest (after all files are written). */
 function injectVersionPlugin() {
   return {
     name: "inject-manifest-version",

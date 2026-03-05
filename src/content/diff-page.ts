@@ -13,8 +13,8 @@ const PATHNAME_REGEXP = new RegExp(`/(.*)/-/merge_requests/(\\d+)/diffs`, 'i');
 const config = new ForegroundConfig();
 config.load();
 
-// Отслеживаем, для каких файлов (data-path) уже была добавлена кнопка,
-// чтобы на странице было не больше одной кнопки на каждый .bpmn.
+// Track for which files (data-path) the button has already been added
+// so that there is no more than one button per .bpmn file on the page.
 const processedDiffPaths = new Set<string>();
 let lastDiffContextKey: string | null = null;
 
@@ -48,7 +48,7 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
         } else
             debug(`Found ${unprocessedPanels.length} unprocessed file actions panels`);
 
-        // получить from/to рефы из MR'а
+        // Get from/to refs from MR
         const [_, repoPath, mrId] = document.location.pathname.match(PATHNAME_REGEXP) ?? [];
 
         if (!repoPath) {
@@ -61,9 +61,9 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
             return this;
         }
 
-        // Если пользователь перешёл на другой MR или репозиторий в том же табе (SPA-навигация),
-        // сбрасываем кэш обработанных путей, чтобы можно было снова добавить кнопку
-        // для тех же относительных путей, но в другом контексте.
+        // If the user navigated to another MR or repository in the same tab (SPA navigation),
+        // we reset the cache of processed paths so that we can add a button again
+        // for the same relative paths but in a different context.
         const contextKey = `${document.location.origin}/${repoPath}/mr/${mrId}`;
         if (lastDiffContextKey !== contextKey) {
             debug(`Diff context changed, resetting processedDiffPaths cache`);
@@ -71,24 +71,24 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
             lastDiffContextKey = contextKey;
         }
 
-        this.stopMountPointObserver(); // дальше будут модификации, на которые нельзя реагировать
+        this.stopMountPointObserver(); // there will be modifications below that must not trigger reactions
 
         const origin = document.location.origin;
         const { source, target } = await getMergeRequestRefs(origin, config.getToken(url), repoPath, mrId);
 
         debug(`Fetched refs from MR`, source, target);
 
-        // добавить кнопку на каждую панельку из unprocessedPanels
+        // Add a button to every panel from unprocessedPanels
         for (const fileActionsPanel of unprocessedPanels) {
             const grandParentElement = fileActionsPanel.parentElement?.parentElement;
             const dataPath = grandParentElement?.getAttribute('data-path')
             if (!grandParentElement || !dataPath)
                 throw Error(`Page structure is corrupt, can't locate a corresponding div with 'data-path' attribute`);
 
-            // Если для данного data-path кнопка уже была добавлена (например, есть
-            // несколько панелей для одного и того же файла), просто помечаем панель
-            // как обработанную и пропускаем вставку кнопки. В итоге на странице
-            // будет не более одной кнопки на каждый .bpmn.
+            // If a button for the given data-path has already been added (for example,
+            // there are several panels for the same file), we just mark the panel
+            // as processed and skip inserting a new button. As a result, there will be
+            // no more than one button per .bpmn on the page.
             if (processedDiffPaths.has(dataPath)) {
                 debug(`Diagram button for ${dataPath} already exists, marking panel as processed without adding a new button`);
                 fileActionsPanel.setAttribute(WATCHDOG_FLAG, "true");
@@ -121,7 +121,7 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
         }
         /*
 
-        this.makeMountPointObserver(mountPointElement); // при динамической подгрузке в больших MR-ах могут появиться новые SELECTOR_FILE_ACTIONS
+        this.makeMountPointObserver(mountPointElement); // on dynamic loading in large MRs new SELECTOR_FILE_ACTIONS may appear
         */
         return this;
     }

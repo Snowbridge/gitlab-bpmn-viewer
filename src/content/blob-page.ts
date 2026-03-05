@@ -67,12 +67,12 @@ export class BlobPageLogic extends DeferredMountPointExecutor {
       return this;
     }
 
-    // Фиксация факта инъекции *до* асинхронных операций, чтобы при
-    // возможных повторных вызовах (дубликат INIT при SPA-переходе)
-    // второй вызов увидел WATCHDOG_FLAG и ничего не добавлял.
+    // Fix the fact of injection *before* asynchronous operations so that
+    // on possible repeated calls (duplicate INIT on SPA navigation)
+    // the second call will see WATCHDOG_FLAG and will not add anything.
     fileActionsPanel.setAttribute(WATCHDOG_FLAG, "true");
 
-    this.stopMountPointObserver(); // мы сейчас будем менять mount point и нам не надо, чтобы обзервер запускал этот же код повторно
+    this.stopMountPointObserver(); // we are going to modify the mount point, and we do not want the observer to rerun this code
 
     const refName = refDropdown.innerText;
     const origin = document.location.origin;

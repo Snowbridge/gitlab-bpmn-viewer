@@ -57,7 +57,7 @@ export class ContextualIconUpdater {
   
     }
 
-    // обновление иконки для заданной табы
+    // Update icon for a given tab
     async updateIconForTab(tabId: number, url?: string) {
         debug(`Updating icon for tab`, tabId, url);
         let path = ICON_DISABLED;
@@ -72,7 +72,7 @@ export class ContextualIconUpdater {
         debug(`The icon is set to ${path}`);
     }
 
-    // запрос текущей табы и обновление иконки, если успешно
+    // Request current tab and update icon, if successful
     async init(){
         const [tab] = await browser.tabs.query({
             active: true,

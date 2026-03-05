@@ -12,10 +12,10 @@ interface LogRecord {
 }
 
 /**
- * Пишет логи в едином формате и в зависимости
- * от настроек debugEnabled и debugStackIncluded в local storage
- * @param message сообщение
- * @param data массив с произвольными данными
+ * Writes logs in a unified format and, depending on
+ * debugEnabled and debugStackIncluded settings in local storage.
+ * @param message message text
+ * @param data array with arbitrary data
  */
 export function debug(message: string, ...data: any[]): void {
 
@@ -47,11 +47,11 @@ export function debug(message: string, ...data: any[]): void {
 }
 
 /**
- * Записать сообщение в консоль
- * @param message - текст сообщения
+ * Write a message to the console
+ * @param message - message text
  * @param timestamp - timestamp
  * @param logger - logger
- * @param data - дополнительный контекст, массив с любыми данными
+ * @param data - additional context, array with any data
  * @param stack - stack
  */
 function log(message: string, timestamp: string, logger?: string, data?: any[], stack?: string[]) {

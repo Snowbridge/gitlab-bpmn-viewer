@@ -5,9 +5,9 @@ import modalTemplate from '@/content/diff-modal.html?raw';
 export const CSS_CLASS_DIAGRAM_BUTTON = `gl-bpmn-viewer-diagram-button` as const;
 
 const DIFF_APPLY_EVENT = "gl-bpmn-diff-apply";
-/** Селектор оверлея модалки (клик по нему закрывает). */
+/** Selector of the modal overlay (click on it closes the modal). */
 const MODAL_OVERLAY_SELECTOR = ".gl-bpmn-diff-modal-overlay";
-/** Селектор кнопки закрытия. */
+/** Selector of the close button. */
 const MODAL_CLOSE_SELECTOR = ".gl-bpmn-diff-modal-close";
 
 export function createIconButton(
@@ -27,7 +27,7 @@ export function createIconButton(
 }
 
 /**
-* Показывает предупреждение пользователю (файл отсутствует в одной из веток).
+* Shows a warning to the user (file is missing in one of the branches).
 */
 export function showWarning(message: string): void {
   const box = document.createElement("div");
@@ -58,8 +58,8 @@ export function showWarning(message: string): void {
 
 
 /**
- * Открывает модальное окно и передаёт уже загруженные from/to в APP.loadSource.
- * @param diagramBtn — кнопка (для закрытия по необходимости не используется, оставлен для единообразия).
+ * Opens a modal dialog and passes already loaded from/to to APP.loadSource.
+ * @param diagramBtn — button (not used for closing, kept for consistency).
  */
 export function openDiagramModalWithContent(
   diagramBtn: HTMLElement,

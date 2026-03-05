@@ -10,9 +10,9 @@ function urlFromString(strUrl: string): URL {
 }
 
 /**
- * Чтение и запись настроек расширения в local storage.
- * Этот класс не имеет подписок и напрямую используется только
- * и исключительно в форме редактирования настроек.
+ * Reading and writing extension settings in local storage.
+ * This class has no subscriptions and is used directly only
+ * in the settings editing form.
  */
 export class BaseConfig {
     private STORAGE_KEY = "gl-bpmn-viewer-configuration";
@@ -41,7 +41,7 @@ export class BaseConfig {
                         let hosts: Array<HostConfig> = [];
                         if (settings.hosts && Array.isArray(settings.hosts)) {
                             hosts = (settings.hosts)
-                                .filter(it => it.host && it.token); // должны обязательно быть оба поля                           
+                                .filter(it => it.host && it.token); // both fields must be present
                         }
 
                         this.update(hosts, settings.debugEnabled, settings.debugStackIncluded)
@@ -122,10 +122,10 @@ export class BaseConfig {
 }
 
 /**
- * Специализация для использования на бэкграунде: добавляет подписку
- * на изменение local storage и перечитывает настройки.
- * Имеет статический метод для создания подписки, отправляющей контент-скрипту
- * сообщение о необходимости перечитать настройки
+ * Specialization for background usage: adds a subscription
+ * to local storage changes and reloads settings.
+ * Has a static method to create a subscription that sends a message
+ * to the content script to reload settings.
  */
 export class BackgroundConfig extends BaseConfig {
     constructor() {
@@ -180,8 +180,8 @@ async function relayConfigChangedEventToForeground(_changes: Record<string, brow
 }
 
 /**
- * Специализация для использования в контент-скриптах: добавляет
- * подписку на сообщение о необходимости перечитать настройки из local storage
+ * Specialization for usage in content scripts: adds
+ * a subscription to the message about reloading settings from local storage
  */
 export class ForegroundConfig extends BaseConfig {
     constructor() {

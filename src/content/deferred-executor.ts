@@ -5,7 +5,7 @@ export abstract class DeferredMountPointExecutor {
     private mountPointObserver?: MutationObserver;
 
     /**
-     * Выполнение привязанной к mountPointSelector бизнес-логики контент-скрипта
+     * Execution of business logic of the content script bound to mountPointSelector
      */
     abstract execute(): Promise<this>;
 
@@ -16,13 +16,13 @@ export abstract class DeferredMountPointExecutor {
         const element = document.querySelector(this.mountPointSelector);
         if (!element) {
             debug(`Mount point is not found during content script initialization`);
-            this.makeBodyObserver(); // ждать, когда появится mount point
+            this.makeBodyObserver(); // wait until the mount point appears
         } else {
             debug(`Mount point found during content script initialization`);
             this.execute()
                 .then(() => {
                     if (!this.mountPointObserver)
-                        this.makeMountPointObserver(element); // после execute() mount point может измениться и может потребоваться повторный запуск execute()
+                        this.makeMountPointObserver(element); // after execute() the mount point may change and a repeated execute() may be needed
                 });
         }
     }
@@ -39,7 +39,7 @@ export abstract class DeferredMountPointExecutor {
                 debug(`Triggering execution in mount point observer [${instanceId}]`);
                 void await this.execute();
             }
-            else { // элемент был, но пропал
+            else { // element existed but disappeared
                 obs.disconnect();
                 debug(`Mount point element observer has disconnected itself [${instanceId}]`);
                 self.makeBodyObserver();
@@ -61,7 +61,7 @@ export abstract class DeferredMountPointExecutor {
             const element = document.querySelector(self.mountPointSelector);
             if (!element)
                 return;
-            obs.disconnect(); // раз mount point элемент есть, то боди обзёрвер уже не нужен
+            obs.disconnect(); // once the mount point element exists, body observer is no longer needed
             debug(`Mount point found, body element observer is disconnected [${instanceId}]`);
             
             void await self.execute();

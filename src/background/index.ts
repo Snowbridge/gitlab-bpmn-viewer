@@ -7,9 +7,9 @@ import { ContextualIconUpdater } from "./contextual-icon-updater";
 const config = new BackgroundConfig();
 
 /**
- * Отправляет контент-странице сообщение для внедрения функционала расширения.
- * Работает только на хостах, которые есть в настройках.
- * Ошибку "Receiving end does not exist" гасим и логируем как debug.
+ * Sends a message to the content page to inject extension functionality.
+ * Works only on hosts that are present in the settings.
+ * The "Receiving end does not exist" error is suppressed and logged as debug.
  */
 async function checkUrlAndSendMessage(
   tabId: number,
@@ -57,8 +57,7 @@ async function checkUrlAndSendMessage(
 }
 
 /**
- * Глобальные подписки, которые триггерят отправку сообщения в контент-скрипт,
- * если вкладка находится в readyTabs.
+ * Global subscriptions that trigger sending a message to the content script.
  */
 browser.tabs.onActivated.addListener(async (activeInfo) => {
   const tab = await browser.tabs.get(activeInfo.tabId);

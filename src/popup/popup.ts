@@ -1,5 +1,5 @@
 /**
- * Popup — быстрый доступ к настройкам
+ * Popup — quick access to settings
  */
 import browser from "webextension-polyfill";
 

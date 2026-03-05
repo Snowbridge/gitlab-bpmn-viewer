@@ -1,5 +1,5 @@
 /**
- * Страница настроек расширения
+ * Extension settings page
  */
 import { BaseConfig } from "@/lib/configuration";
 import { HostConfig } from "@/types/settings";
