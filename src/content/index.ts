@@ -1,82 +1,89 @@
-/**
- * Content script — внедряется в страницы GitLab.
- * Оркестратор: проверяет хост по настройкам (3.1) и делегирует blob- или diff-странице.
- */
-import "bpmn-js/dist/assets/diagram-js.css";
-import "bpmn-js/dist/assets/bpmn-js.css";
 
-import browser from "webextension-polyfill";
+import urlMessageResolver from "@/lib/url-message-resolver";
+import { CommunicationMessage, MESSAGE_TYPE_BLOB_CONTENT_INIT, MESSAGE_TYPE_CONTENT_SCRIPT_READY, MESSAGE_TYPE_DIFF_CONTENT_INIT } from "@/types/messages";
+import browser, { Runtime } from "webextension-polyfill";
+import { BlobPageLogic } from "./blob-page";
+import { DiffPageLogic } from "./diff-page";
+import { ForegroundConfig } from "@/lib/configuration";
+import { debug } from "@/lib/logger";
 
-import {
-  getHostFromUrl,
-  isHostConfigured,
-  loadSettings,
-  parseBlobUrl,
-} from "../lib";
-import { initBlobPage } from "./blob-page";
-import { initDiffPage, isDiffPage } from "./diff-page";
-import { debug } from "./utils";
+function emptyWatchdogHandler() {/* empty by purpose */ }
 
-/** URL страницы, для которой уже выполнялся init (избегаем двойного запуска). */
-let lastInitUrl: string | null = null;
+const config = new ForegroundConfig();
+config.load();
 
-async function init(overrideUrl?: string): Promise<void> {
-  debug("init for", overrideUrl);
-  const url = overrideUrl ?? window.location.href;
-  const host = getHostFromUrl(url);
-  if (!host) {
-    debug("init: no host");
-    return;
+// Синглтон нужен только для diff-страниц, чтобы не плодить наблюдателей
+// и не дублировать кнопки. Для blob-страниц, наоборот, логика должна
+// переинициализироваться на каждый SPA-переход.
+let diffPageLogicInstance: DiffPageLogic | null = null;
+
+async function init() {
+
+  // Инициализация по сигналу от background-скрипта (SPA-навигация и т.п.).
+  if (!browser.runtime.onMessage.hasListener(emptyWatchdogHandler)) {
+    browser.runtime.onMessage.addListener(emptyWatchdogHandler);
+    browser.runtime.onMessage.addListener(onMessageFromBackgroundHandler);
   }
 
-  const settings = await loadSettings();
-  if (!isHostConfigured(settings, host)) {
-    debug("init: host is not configured", { host });
-    return;
-  }
+  debug(`Foreground event listeners are set up, notifying background...`);
 
-  const blobParts = parseBlobUrl(url);
-  if (blobParts) {
-    if (lastInitUrl === url) {
-      debug("init: blobParts, already initialized for url", {
-        lastInitUrl,
-        url,
-      });
-      return;
+  try {
+    await browser.runtime.sendMessage({
+      type: MESSAGE_TYPE_CONTENT_SCRIPT_READY,
+      url: window.location.href
+    });
+  } catch (error: unknown) {
+    const msg = (error as Error)?.message ?? String(error);
+    if (msg.includes("Could not establish connection. Receiving end does not exist")) {
+      debug(
+        "Background script is not ready yet while sending CONTENT_SCRIPT_READY",
+        window.location.href
+      );
+    } else {
+      debug(
+        "Unexpected error while sending CONTENT_SCRIPT_READY",
+        window.location.href,
+        msg
+      );
     }
-    lastInitUrl = url;
-    setTimeout(() => {
-      initBlobPage();
-    }, 1500); 
-    return;
   }
-
-  if (isDiffPage(url)) {
-    if (lastInitUrl === url) {
-      debug("init: diffPage, already initialized for url", {
-        lastInitUrl,
-        url,
-      });
-      return;
-    }
-    lastInitUrl = url;
-    setTimeout(() => {
-      initDiffPage();
-    }, 1500);    
-    return;
-  }
-
-  lastInitUrl = url;
 }
 
-// Первичная инициализация при полной загрузке контент-скрипта.
-void init();
+function onMessageFromBackgroundHandler(message: unknown, _sender: Runtime.MessageSender) {
+  if (!(message as CommunicationMessage).type)
+    return;
 
-// Инициализация по сигналу от background-скрипта (SPA-навигация и т.п.).
-browser.runtime.onMessage.addListener((message: unknown) => {
-  const typed = message as { type?: string; url?: string };
-  debug("content onMessage", typed);
-  if (typed.type === "gl-bpmn-viewer-init") {
-    void init(typed.url);
+  void processMessageFromBackground((message as CommunicationMessage));
+}
+
+async function processMessageFromBackground(message: CommunicationMessage) {
+
+  await config.load();
+
+  if (!config.isHostConfigured(message.url))
+    return; // это значит, что мы находимся на diff/blob-странице, но на сайте, хост которого отсутствует в настройках
+
+  const messageType = message.type ?? urlMessageResolver(message.url);
+
+  switch (messageType) {
+    case MESSAGE_TYPE_BLOB_CONTENT_INIT:
+      // Blob-страницы: каждый INIT соответствует новой blob-странице (в т.ч. при SPA),
+      // поэтому создаём новый экземпляр логики каждый раз.
+      // Защита от дубликатов реализована внутри самой BlobPageLogic через WATCHDOG_FLAG.
+      new BlobPageLogic();
+      break;
+    case MESSAGE_TYPE_DIFF_CONTENT_INIT:
+      // Diff-страницы: держим один экземпляр логики на весь жизненный цикл контент-скрипта
+      // в табе, чтобы не плодить наблюдателей и не дублировать кнопки.
+      if (!diffPageLogicInstance) {
+        diffPageLogicInstance = new DiffPageLogic();
+      } else {
+        debug(`DiffPageLogic is already initialized, skipping re-init`);
+      }
+      break;
+    default:
+      debug(`This is not a diff/blob page`, message.url);
   }
-});
+}
+
+init();

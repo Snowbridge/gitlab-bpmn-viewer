@@ -12,8 +12,8 @@
   },
   "permissions": ["storage", "activeTab", "tabs", "webNavigation"],
   "host_permissions": [
-    "*://*/*/-/blob/*",
-    "*://*/*/-/merge_requests/*",
+    "*://*/*/-/blob/*/*.bpmn*",
+    "*://*/*/-/merge_requests/*/diffs",
     "*://*/*/api/v4/*"
   ],
   "browser_specific_settings": {
@@ -40,7 +40,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*/*/-/blob/*",
+        "*://*/*/-/blob/*.bpmn*",
+        "*://*/*/-/tree/*",
         "*://*/*/-/merge_requests/*"
       ],
       "js": ["src/content/index.ts"],
