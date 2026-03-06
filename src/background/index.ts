@@ -6,6 +6,27 @@ import { ContextualIconUpdater } from "./contextual-icon-updater";
 
 const config = new BackgroundConfig();
 
+async function ensureContentScriptInjected(tabId: number, url: string): Promise<boolean> {
+  await config.load();
+  if (!config.isHostConfigured(url)) return false;
+
+  // Для SPA-навигаций: если content script не был загружен на стартовой странице,
+  // браузер не подгрузит его сам при History API переходе.
+  // Поэтому при необходимости инжектим вручную.
+  try {
+    // В собранном расширении файл будет `src/content/index.js`.
+    await browser.scripting.executeScript({
+      target: { tabId },
+      files: ["src/content/index.js"],
+    });
+    return true;
+  } catch (error: unknown) {
+    const msg = (error as Error)?.message ?? String(error);
+    debug("Unable to inject content script via scripting.executeScript", tabId, url, msg);
+    return false;
+  }
+}
+
 /**
  * Sends a message to the content page to inject extension functionality.
  * Works only on hosts that are present in the settings.
@@ -44,6 +65,27 @@ async function checkUrlAndSendMessage(
         url,
         eventSource
       );
+
+      // Попытка самовосстановления: инжектим content script и ретраим ровно 1 раз.
+      const injected = await ensureContentScriptInjected(tabId, url);
+      if (injected) {
+        try {
+          await browser.tabs.sendMessage(tabId, {
+            type: message,
+            url: url,
+            eventSource: `${eventSource}[afterInject]`,
+          });
+        } catch (retryError: unknown) {
+          const retryMsg = (retryError as Error)?.message ?? String(retryError);
+          debug(
+            "Retry sendMessage failed after content script injection",
+            tabId,
+            url,
+            eventSource,
+            retryMsg
+          );
+        }
+      }
     } else {
       debug(
         "Unexpected error while sending message to foreground",

@@ -10,10 +10,10 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "activeTab", "tabs", "webNavigation"],
+  "permissions": ["storage", "activeTab", "tabs", "webNavigation", "scripting"],
   "host_permissions": [
-    "*://*/*/-/blob/*/*.bpmn*",
-    "*://*/*/-/merge_requests/*/diffs",
+    "*://*/*/-/blob/*",
+    "*://*/*/-/merge_requests/*",
     "*://*/*/api/v4/*"
   ],
   "browser_specific_settings": {
@@ -40,7 +40,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*/*/-/blob/*.bpmn*",
+        "*://*/*/-/blob/*",
         "*://*/*/-/tree/*",
         "*://*/*/-/merge_requests/*"
       ],
