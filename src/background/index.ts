@@ -3,6 +3,7 @@ import { debug } from "@/lib/logger";
 import urlMessageResolver from "@/lib/url-message-resolver";
 import browser from "webextension-polyfill";
 import { ContextualIconUpdater } from "./contextual-icon-updater";
+import { MESSAGE_TYPE_CONFIG_CHANGED } from "@/types/messages";
 
 const config = new BackgroundConfig();
 
@@ -135,6 +136,31 @@ browser.webNavigation.onHistoryStateUpdated.addListener(
   },
   { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
 );
+
+browser.storage.onChanged.addListener(async (_changes: Record<string, browser.Storage.StorageChange>, areaName: string) => {
+  if (areaName === "local") {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+
+    if (!tab || !tab.url || !tab.id)
+      return;
+
+    const isResolved = urlMessageResolver(tab.url);
+    if (isResolved) {
+      debug("Relaying config changed event to foreground", tab.url);
+      try {
+        void await browser.tabs.sendMessage(tab.id, {
+          type: MESSAGE_TYPE_CONFIG_CHANGED,
+          url: tab.url,
+        });
+      } catch {
+        /* nothing: there's no content-script on the tab, so no need to update config either */
+      }
+    }
+  }
+});
 
 async function initBackgroundScript() {
   await config.load();

@@ -1,7 +1,6 @@
 import { BackgroundConfig } from "./configuration";
 
 const config = new BackgroundConfig();
-config.load();
 
 interface LogRecord {
     message: string;

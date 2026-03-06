@@ -1,11 +1,10 @@
 import { MESSAGE_TYPE_CONFIG_CHANGED } from "@/types/messages";
 import { HostConfig, StoredSettings } from "@/types/settings";
 import browser from "webextension-polyfill";
-import urlMessageResolver from "./url-message-resolver";
 
 function urlFromString(strUrl: string): URL {
     if (!strUrl.match(/^[a-z]\w*:\/\//))
-        strUrl = `proto://${strUrl}`;
+        strUrl = `https://${strUrl}`;
     return new URL(strUrl);
 }
 
@@ -14,64 +13,58 @@ function urlFromString(strUrl: string): URL {
  * This class has no subscriptions and is used directly only
  * in the settings editing form.
  */
-export class BaseConfig {
+class BaseConfig {
     private STORAGE_KEY = "gl-bpmn-viewer-configuration";
     private hosts: Array<HostConfig> = [];
     private debugEnabled = false;
     private debugStackIncluded = false;
-
     private loadPromise?: Promise<this>;
 
-    constructor() {
-        this.init();
-    }
 
-    protected init() {
+    async refresh(): Promise<this>{
+        if(this.debugEnabled)
+            console.log(`Reloading config from storage`);
+
         this.loadPromise = undefined;
-        return this;
+        return await this.load();
     }
 
     async load(): Promise<this> {
-        if (!this.loadPromise) {
-            this.loadPromise = new Promise<this>((resolve, reject) => {
-                browser.storage.local
-                    .get(this.STORAGE_KEY)
-                    .then((rawStorageData) => {
-                        const rawSettings = rawStorageData[this.STORAGE_KEY] as Partial<StoredSettings> | undefined;
+        if(this.loadPromise)
+            return this.loadPromise;
 
-                        const rawHosts = Array.isArray(rawSettings?.hosts) ? rawSettings.hosts : [];
-                        const hosts: Array<HostConfig> = rawHosts
-                            .filter((it): it is HostConfig => !!it && typeof it.host === "string" && typeof it.token === "string")
-                            .filter(it => it.host && it.token); // both fields must be present
+        this.loadPromise = new Promise<this>((resolve, reject)=>{
+            browser.storage.local.get(this.STORAGE_KEY)
+            .then((rawStorageData)=>{
+                const rawSettings = rawStorageData[this.STORAGE_KEY] as Partial<StoredSettings> | undefined;
+                if (!rawSettings) {
+                    if(this.debugEnabled)
+                        console.log(`No settings found in local storage`);
+                    return resolve(this);
+                }
 
-                        const debugEnabled =
-                            typeof rawSettings?.debugEnabled === "boolean"
-                                ? rawSettings.debugEnabled
-                                : false;
+                const debugEnabled = rawSettings?.debugEnabled == true;
+                const debugStackIncluded = rawSettings?.debugStackIncluded == true;
 
-                        const debugStackIncluded =
-                            typeof rawSettings?.debugStackIncluded === "boolean"
-                                ? rawSettings.debugStackIncluded
-                                : false;
+                const hosts = Array.isArray(rawSettings?.hosts) ? rawSettings.hosts : [];
+                this.update(hosts, debugEnabled, debugStackIncluded);
+                if(debugEnabled)
+                    console.log(`Settings loaded from local storage successfully`);
+                resolve(this);
+            })
+            .catch((error)=>{
+                console.log(`Can not load settings from local storage`, error);
+                reject(this);
+            })
+        });
 
-                        this.update(hosts, debugEnabled, debugStackIncluded);
-
-                        console.log(`Settings loaded from local storage successfully`);
-                        resolve(this);
-                    })
-                    .catch((error) => {
-                        console.log(`Can not load settings from local storage`, error);
-                        reject(error);
-                    });
-            });
-        }
-        return this.loadPromise
+        return this.loadPromise;
     }
 
     update(hosts: Array<HostConfig>, isDebugEnabled: boolean, isDebugStackIncluded: boolean) {
-        this.setHosts(hosts);
         this.debugEnabled = isDebugEnabled;
         this.debugStackIncluded = isDebugStackIncluded;
+        this.setHosts(hosts);
     }
 
     async save() {
@@ -84,7 +77,8 @@ export class BaseConfig {
                     debugStackIncluded: this.debugStackIncluded,
                 }
             });
-            console.log(`Settings saved in local storage successfully`);
+            if(this.debugEnabled)
+                console.log(`Settings saved in local storage successfully`);
         } catch (error) {
             console.log(`Unable to save settings in local storage`, error);
             throw error;
@@ -95,11 +89,11 @@ export class BaseConfig {
         this.hosts = hosts
             .map(row => {
                 const url = urlFromString(row.host);
-                if (!row.host.includes(url.host))
-                    throw Error(`Gitlab BPMN Viewer cant operate non-latin domains right now`);
                 return { host: url.host, token: row.token } as HostConfig;
             })
-            .filter(it => it.host.length > 0 && it.token.length > 0)
+            .filter(it => it.host.length > 0 && it.token.length > 0);
+        if(this.debugEnabled)
+            console.log(`Loaded hosts [${this.hosts.map(it => it.host).join(', ')}]`);
     }
 
     isDebugEnabled(): boolean {
@@ -113,7 +107,9 @@ export class BaseConfig {
     isHostConfigured(url: string): boolean {
         try {
             const host = urlFromString(url).host;
-            return this.hosts.some(it => it.host == host)
+            if(this.debugEnabled)
+                console.log(`Checking ${host} among known hosts: [${this.hosts.map(it => it.host).join(', ')}]`);
+            return this.hosts.some(it => it.host.toLowerCase() == host.toLowerCase());
         } catch (error) {
             console.log(`Unable to parse url`, url, error);
         }
@@ -132,83 +128,38 @@ export class BaseConfig {
 }
 
 /**
- * Specialization for background usage: adds a subscription
- * to local storage changes and reloads settings.
- * Has a static method to create a subscription that sends a message
- * to the content script to reload settings.
+ * Specialized config for background scripts:
+ *  it refreshes itself on browser.storage.onChanged
  */
-export class BackgroundConfig extends BaseConfig {
-    constructor() {
+export class BackgroundConfig extends BaseConfig{
+
+    constructor(){        
         super();
 
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
-        if(!browser.storage.onChanged.hasListener(emptyWatchdogHandler)){
-            browser.storage.onChanged.addListener(emptyWatchdogHandler)
-            browser.storage.onChanged.addListener(async (_changes: Record<string, browser.Storage.StorageChange>, areaName: string) => {
-                if (areaName === "local") {
-                    console.log(`Settings changed in local storage, reloading`);
-                    void await self.init().load();
-                }    
-            });
-        }
-            
-    }
-    
-    /**
-     * При изменениях настроек в хранилище отправляет фронту
-     * сообщение о том, что надо перечитать конфиг.
-     */
-    static addBackgroundSubscriptionOnChange() {
-        if (!browser.storage.onChanged.hasListener(relayConfigChangedEventToForeground))
-            browser.storage.onChanged.addListener(relayConfigChangedEventToForeground);
-    }
-}
-
-async function relayConfigChangedEventToForeground(_changes: Record<string, browser.Storage.StorageChange>, areaName: string) {
-    if (areaName === "local") {
-        const [tab] = await browser.tabs.query({
-            active: true,
-            currentWindow: true,
-        });
-
-        if (!tab.url || !tab.id)
-            return;
-
-        const isResolved = urlMessageResolver(tab.url);
-        if (isResolved){
-            console.log(
-                "Relaying config changed event to foreground",
-                tab.url
-            );
-            void await browser.tabs.sendMessage(tab.id, {
-                type: MESSAGE_TYPE_CONFIG_CHANGED,
-                url: tab.url,
-            });
-        }
+        browser.storage.onChanged.addListener(async (_changes: Record<string, browser.Storage.StorageChange>, areaName: string) => {
+            if (areaName === "local") {
+                await self.refresh();
+            }
+        })
     }
 }
 
 /**
- * Specialization for usage in content scripts: adds
- * a subscription to the message about reloading settings from local storage
+ * Specialization for usage in content scripts: 
+ *  self refreshing on browser.runtime.onMessage[MESSAGE_TYPE_CONFIG_CHANGED]
  */
 export class ForegroundConfig extends BaseConfig {
     constructor() {
         super();
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
-        if(!browser.runtime.onMessage.hasListener(emptyWatchdogHandler)){
-            browser.runtime.onMessage.addListener(emptyWatchdogHandler);
-            browser.runtime.onMessage.addListener((message: unknown) => {
-                const typed = message as { type: string; url: string; token: string };
-                if (typed.type == MESSAGE_TYPE_CONFIG_CHANGED) {
-                    console.log(`Settings changed in local storage, reloading`);
-                    self.init().load();
-                }
-            });    
-        }
+        browser.runtime.onMessage.addListener(async (message: unknown) => {
+            const typed = message as { type: string; url: string; token: string };
+            if (typed.type == MESSAGE_TYPE_CONFIG_CHANGED) {
+                await self.refresh();
+            }
+        });
     }
 }
-
-function emptyWatchdogHandler(){/* empty by purpose */}

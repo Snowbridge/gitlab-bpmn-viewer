@@ -1,7 +1,7 @@
 /**
  * Extension settings page
  */
-import { BaseConfig } from "@/lib/configuration";
+import { BackgroundConfig } from "@/lib/configuration";
 import { HostConfig } from "@/types/settings";
 
 const HOSTS_LIST_ID = "hosts-list";
@@ -89,7 +89,7 @@ function showStatus(message: string, isError = false): void {
 }
 
 async function init() {
-  const config = new BaseConfig();
+  const config = new BackgroundConfig();
   await config.load();
 
   const hostsList = getEl<HTMLDivElement>(HOSTS_LIST_ID);

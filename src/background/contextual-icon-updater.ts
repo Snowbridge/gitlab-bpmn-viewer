@@ -1,4 +1,4 @@
-import { BaseConfig } from "@/lib/configuration";
+import { BackgroundConfig } from "@/lib/configuration";
 import { debug } from "@/lib/logger";
 import browser from "webextension-polyfill";
 
@@ -8,8 +8,8 @@ const ICON_DISABLED = "/icons/icon16gray.png";
 function emptyWatchdogHandler(){/* empty by purpose */}
 
 export class ContextualIconUpdater {
-    private config: BaseConfig;
-    constructor(config: BaseConfig){
+    private config: BackgroundConfig;
+    constructor(config: BackgroundConfig){
         this.config = config;
         this.subscribeListeners();
     }
@@ -66,6 +66,7 @@ export class ContextualIconUpdater {
 
         const isHostConfigured = url && this.config.isHostConfigured(url);
         debug(`Host ${isHostConfigured ? 'IS' : 'is NOT'} configured fo url ${url}`);
+        
 
         if (isHostConfigured)
             path = ICON_ENABLED;
