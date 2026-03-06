@@ -31,7 +31,7 @@ export function debug(message: string, ...data: any[]): void {
             const payload: LogRecord = {
                 message: message,
                 timestamp: timestamp,
-                logger: stack.at(1)?.trim() ?? "<unknown>", // строчка кода, из которой вызван debug()
+                logger: stack.at(1)?.trim() ?? "<unknown>", // the call site (line) where debug() was invoked
                 data: data
             };
 

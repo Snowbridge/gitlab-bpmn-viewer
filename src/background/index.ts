@@ -11,11 +11,11 @@ async function ensureContentScriptInjected(tabId: number, url: string): Promise<
   await config.load();
   if (!config.isHostConfigured(url)) return false;
 
-  // Для SPA-навигаций: если content script не был загружен на стартовой странице,
-  // браузер не подгрузит его сам при History API переходе.
-  // Поэтому при необходимости инжектим вручную.
+  // SPA navigation: if the content script was not loaded on the initial document,
+  // the browser will not automatically inject it after a History API route change.
+  // Inject it manually when needed.
   try {
-    // В собранном расширении файл будет `src/content/index.js`.
+    // In the built extension this file becomes `src/content/index.js`.
     await browser.scripting.executeScript({
       target: { tabId },
       files: ["src/content/index.js"],
@@ -67,7 +67,7 @@ async function checkUrlAndSendMessage(
         eventSource
       );
 
-      // Попытка самовосстановления: инжектим content script и ретраим ровно 1 раз.
+      // Self-healing: inject the content script and retry exactly once.
       const injected = await ensureContentScriptInjected(tabId, url);
       if (injected) {
         try {
