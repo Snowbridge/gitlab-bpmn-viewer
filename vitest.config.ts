@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    environmentOptions: {
+      jsdom: { url: "https://git.example.com/" },
+    },
     setupFiles: ["tests/setup.ts"],
     coverage: {
       provider: "v8",

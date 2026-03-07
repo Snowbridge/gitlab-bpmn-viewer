@@ -12,11 +12,10 @@ const SELECTOR_FILE_CONTENT = `#fileHolder .file-content.code.blob-content` as c
 const SELECTOR_REF_DROPDOWN = `div.tree-ref-holder > div.ref-selector > button > span > span` as const;
 
 export class BlobPageLogic extends DeferredMountPointExecutor {
-  private config: BaseConfig;
+
   
   constructor(config: BaseConfig, logger: Logger) {
-    super("#fileHolder", logger);
-    this.config = config;
+    super("#fileHolder", config, logger);
   }
 
   async execute(): Promise<this> {

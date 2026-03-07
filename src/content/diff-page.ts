@@ -17,10 +17,9 @@ const processedDiffPaths = new Set<string>();
 let lastDiffContextKey: string | null = null;
 
 export class DiffPageLogic extends DeferredMountPointExecutor {
-    private config: BaseConfig;
   
     constructor(config: BaseConfig, logger: Logger) {
-        super("div.diff-files-holder", logger);
+        super("div.diff-files-holder", config, logger);
         this.config = config;
     }
 

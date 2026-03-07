@@ -16,7 +16,10 @@ vi.mock("webextension-polyfill", () => ({
       onActivated: { addListener: () => {}, hasListener: () => false },
       onUpdated: { addListener: () => {}, hasListener: () => false },
     },
-    runtime: { onInstalled: { addListener: () => {}, hasListener: () => false } },
+    runtime: {
+      onInstalled: { addListener: () => {}, hasListener: () => false },
+      getURL: (path: string) => `extension://${path}`,
+    },
     action: { setIcon: () => Promise.resolve() },
     scripting: { executeScript: () => Promise.resolve() },
     webNavigation: {

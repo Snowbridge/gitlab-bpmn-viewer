@@ -1,3 +1,4 @@
+import { BaseConfig } from "@/lib/configuration";
 import { Logger } from "@/lib/logger";
 import { getRandomString } from "@/lib/utils";
 
@@ -5,6 +6,7 @@ export abstract class DeferredMountPointExecutor {
 
     private mountPointObserver?: MutationObserver;
     protected logger:Logger;
+    protected config: BaseConfig;
 
     /**
      * Execution of business logic of the content script bound to mountPointSelector
@@ -13,9 +15,10 @@ export abstract class DeferredMountPointExecutor {
 
     protected mountPointSelector: string;
 
-    constructor(mountPointSelector: string, logger:Logger) {
+    constructor(mountPointSelector: string, config: BaseConfig, logger:Logger) {
         this.mountPointSelector = mountPointSelector;
         this.logger = logger;
+        this.config = config;
 
         const element = document.querySelector(this.mountPointSelector);
         if (!element) {
