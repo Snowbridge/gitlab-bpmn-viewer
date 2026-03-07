@@ -8,10 +8,12 @@ vi.mock("@/lib/gitlab-api", () => ({
   getMergeRequestRefs: vi.fn().mockResolvedValue({ source: "startSha", target: "headSha" }),
 }));
 
+let lastCreatedDiagramBtn: HTMLButtonElement | null = null;
 vi.mock("@/lib/html-utils", () => ({
   createIconButton: vi.fn(() => {
     const btn = document.createElement("button");
     btn.className = "gl-bpmn-viewer-diagram-button";
+    lastCreatedDiagramBtn = btn;
     return btn;
   }),
   openDiagramModalWithContent: vi.fn(),
@@ -52,6 +54,7 @@ describe("DiffPageLogic", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    lastCreatedDiagramBtn = null;
     mockConfig = {
       load: vi.fn().mockResolvedValue(undefined),
       isHostConfigured: vi.fn().mockReturnValue(true),
@@ -77,5 +80,95 @@ describe("DiffPageLogic", () => {
       "group/repo",
       "1"
     );
+  });
+
+  it("click on diagram button fetches both file versions and opens modal with content", async () => {
+    setupDiffDom();
+    const { fetchFileRaw } = await import("@/lib/gitlab-api");
+    const { openDiagramModalWithContent } = await import("@/lib/html-utils");
+    vi.mocked(fetchFileRaw)
+      .mockResolvedValueOnce("<source-bpmn/>")
+      .mockResolvedValueOnce("<target-bpmn/>");
+
+    new DiffPageLogic(
+      mockConfig as unknown as BaseConfig,
+      mockLogger as unknown as Logger
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const diagramBtn = lastCreatedDiagramBtn;
+    expect(diagramBtn).toBeTruthy();
+    diagramBtn!.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(fetchFileRaw).toHaveBeenCalledTimes(2);
+    expect(fetchFileRaw).toHaveBeenCalledWith(
+      origin,
+      "token",
+      "group/repo",
+      "startSha",
+      "path/to/file.bpmn"
+    );
+    expect(fetchFileRaw).toHaveBeenCalledWith(
+      origin,
+      "token",
+      "group/repo",
+      "headSha",
+      "path/to/file.bpmn"
+    );
+    expect(openDiagramModalWithContent).toHaveBeenCalledWith(
+      diagramBtn!,
+      "<source-bpmn/>",
+      "<target-bpmn/>"
+    );
+  });
+
+  it("click on diagram button shows warning and does not open modal when fetch fails", async () => {
+    setupDiffDom();
+    const { fetchFileRaw } = await import("@/lib/gitlab-api");
+    const { openDiagramModalWithContent, showWarning } = await import("@/lib/html-utils");
+    vi.mocked(fetchFileRaw)
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce("<target-bpmn/>");
+
+    new DiffPageLogic(
+      mockConfig as unknown as BaseConfig,
+      mockLogger as unknown as Logger
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const diagramBtn = lastCreatedDiagramBtn;
+    expect(diagramBtn).toBeTruthy();
+    diagramBtn!.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(showWarning).toHaveBeenCalledWith(
+      expect.stringContaining("Не удалось получить версию файла из репозитория")
+    );
+    expect(openDiagramModalWithContent).not.toHaveBeenCalled();
+  });
+
+  it("click on diagram button shows two warnings when both fetches fail", async () => {
+    setupDiffDom();
+    const { fetchFileRaw } = await import("@/lib/gitlab-api");
+    const { openDiagramModalWithContent, showWarning } = await import("@/lib/html-utils");
+    vi.mocked(fetchFileRaw).mockRejectedValue(new Error("API error"));
+
+    new DiffPageLogic(
+      mockConfig as unknown as BaseConfig,
+      mockLogger as unknown as Logger
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const diagramBtn = lastCreatedDiagramBtn;
+    expect(diagramBtn).toBeTruthy();
+    diagramBtn!.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(showWarning).toHaveBeenCalledTimes(2);
+    expect(openDiagramModalWithContent).not.toHaveBeenCalled();
   });
 });

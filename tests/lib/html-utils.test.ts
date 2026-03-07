@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createIconButton,
   showWarning,
+  openDiagramModalWithContent,
   CSS_CLASS_DIAGRAM_BUTTON,
 } from "@/lib/html-utils";
 
@@ -11,6 +12,10 @@ vi.mock("webextension-polyfill", () => ({
       getURL: (path: string) => `extension://${path}`,
     },
   },
+}));
+
+vi.mock("@/content/diff-modal.html?raw", () => ({
+  default: `<div class="gl-bpmn-diff-modal-overlay"><button type="button" class="gl-bpmn-diff-modal-close" aria-label="Закрыть">×</button></div>`,
 }));
 
 describe("html-utils", () => {
@@ -58,6 +63,72 @@ describe("html-utils", () => {
       expect(document.body.querySelector("[role='alert']")).toBeTruthy();
       vi.advanceTimersByTime(8000);
       expect(document.body.querySelector("[role='alert']")).toBeFalsy();
+    });
+  });
+
+  describe("openDiagramModalWithContent", () => {
+    const DIFF_APPLY_EVENT = "gl-bpmn-diff-apply";
+
+    beforeEach(() => {
+      document.body.innerHTML = "";
+      document.head.innerHTML = "";
+    });
+
+    it("appends overlay to body and injects script with from/to", () => {
+      const btn = document.createElement("button");
+      openDiagramModalWithContent(btn, "<source/>", "<target/>");
+
+      const overlay = document.body.querySelector(".gl-bpmn-diff-modal-overlay");
+      expect(overlay).toBeTruthy();
+      expect(overlay?.querySelector(".gl-bpmn-diff-modal-close")).toBeTruthy();
+
+      const script = overlay?.querySelector("script");
+      expect(script?.src).toContain("scripts/diff-app.js");
+      expect(script?.async).toBe(true);
+    });
+
+    it("dispatches DIFF_APPLY_EVENT with from and to when script onload fires", () => {
+      const btn = document.createElement("button");
+      let receivedDetail: { from: string; to: string } | null = null;
+      document.addEventListener(DIFF_APPLY_EVENT, ((e: CustomEvent) => {
+        receivedDetail = e.detail;
+      }) as EventListener);
+
+      openDiagramModalWithContent(btn, "<xml-a/>", "<xml-b/>");
+
+      const script = document.body.querySelector(".gl-bpmn-diff-modal-overlay script");
+      expect(script).toBeTruthy();
+      (script as HTMLScriptElement).onload?.({} as Event);
+      expect(receivedDetail).toEqual({ from: "<xml-a/>", to: "<xml-b/>" });
+    });
+
+    it("closes modal when overlay is clicked", () => {
+      const btn = document.createElement("button");
+      openDiagramModalWithContent(btn, "a", "b");
+
+      const overlay = document.body.querySelector(".gl-bpmn-diff-modal-overlay") as HTMLElement;
+      expect(overlay).toBeTruthy();
+      overlay.click();
+      expect(document.body.querySelector(".gl-bpmn-diff-modal-overlay")).toBeFalsy();
+    });
+
+    it("closes modal when close button is clicked", () => {
+      const btn = document.createElement("button");
+      openDiagramModalWithContent(btn, "a", "b");
+
+      const closeBtn = document.body.querySelector(".gl-bpmn-diff-modal-close") as HTMLElement;
+      expect(closeBtn).toBeTruthy();
+      closeBtn.click();
+      expect(document.body.querySelector(".gl-bpmn-diff-modal-overlay")).toBeFalsy();
+    });
+
+    it("closes modal on Escape key", () => {
+      const btn = document.createElement("button");
+      openDiagramModalWithContent(btn, "a", "b");
+
+      expect(document.body.querySelector(".gl-bpmn-diff-modal-overlay")).toBeTruthy();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      expect(document.body.querySelector(".gl-bpmn-diff-modal-overlay")).toBeFalsy();
     });
   });
 });
