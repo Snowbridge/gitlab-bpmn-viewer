@@ -54,10 +54,10 @@ export class ContentScriptInitializer {
 
         switch (messageType) {
             case MESSAGE_TYPE_BLOB_CONTENT_INIT:
-                new BlobPageLogic();
+                new BlobPageLogic(this.config,this.logger);
                 break;
             case MESSAGE_TYPE_DIFF_CONTENT_INIT:
-                new DiffPageLogic();
+                new DiffPageLogic(this.config,this.logger);
                 break;
             default:
                 this.logger.debug(`This is not a diff/blob page`, message.url);

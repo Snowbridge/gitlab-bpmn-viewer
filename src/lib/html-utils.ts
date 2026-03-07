@@ -1,5 +1,4 @@
 import browser from "webextension-polyfill";
-import { debug } from "./logger";
 import modalTemplate from '@/content/diff-modal.html?raw';
 
 export const CSS_CLASS_DIAGRAM_BUTTON = `gl-bpmn-viewer-diagram-button` as const;
@@ -67,12 +66,10 @@ export function openDiagramModalWithContent(
   to: string
 ): void {
 
-  debug(`Opening modal with diagrams diff`);
   const wrap = document.createElement("div");
   wrap.innerHTML = modalTemplate;
   const overlay = wrap.querySelector<HTMLElement>(MODAL_OVERLAY_SELECTOR);
   if (!overlay) {
-    debug(`overlay not found`);
     return;
   }
   const overlayEl: HTMLElement = overlay;
@@ -102,17 +99,14 @@ export function openDiagramModalWithContent(
   script.src = browser.runtime.getURL("scripts/diff-app.js");
   script.async = true;
   script.onload = (): void => {
-    debug(`scripts/diff-app.js is loaded`);
     document.dispatchEvent(
       new CustomEvent(DIFF_APPLY_EVENT, { detail: { from, to } })
     );
   };
   overlayEl.appendChild(script);
-  debug(`scripts/diff-app.js is appended`);
 }
 
 function injectDiffApplyBridge(): void {
-  debug(`injectDiffApplyBridge`);
   const script = document.createElement("script");
   script.src = browser.runtime.getURL("scripts/diff-apply-bridge.js");
   ;(document.head || document.documentElement).appendChild(script);

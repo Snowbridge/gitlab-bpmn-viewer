@@ -1,10 +1,9 @@
-import { debug } from "@/lib/logger";
+import { Logger } from "@/lib/logger";
 import { DeferredMountPointExecutor } from "./deferred-executor";
-import { ForegroundConfig } from "@/lib/configuration";
+import { BaseConfig } from "@/lib/configuration";
 import { fetchFileRaw } from "@/lib/gitlab-api";
 import NavigatedViewer from "bpmn-js/lib/NavigatedViewer";
 import { createIconButton } from "@/lib/html-utils";
-import browser from "webextension-polyfill";
 
 const WATCHDOG_FLAG = `gl-bpmn-viewer-is-injected` as const;
 const SELECTOR_FILE_ACTIONS = `div.file-actions` as const;
@@ -12,59 +11,59 @@ const SELECTOR_BUTTONS = `#fileHolder div.file-actions > :last-child` as const;
 const SELECTOR_FILE_CONTENT = `#fileHolder .file-content.code.blob-content` as const;
 const SELECTOR_REF_DROPDOWN = `div.tree-ref-holder > div.ref-selector > button > span > span` as const;
 
-const config = new ForegroundConfig(browser);
-config.load();
-
 export class BlobPageLogic extends DeferredMountPointExecutor {
-  constructor() {
-    super("#fileHolder");
+  private config: BaseConfig;
+  
+  constructor(config: BaseConfig, logger: Logger) {
+    super("#fileHolder", logger);
+    this.config = config;
   }
 
   async execute(): Promise<this> {
-    debug(`Injecting blob-pages business logic`);
+    this.logger.debug(`Injecting blob-pages business logic`);
 
     if (!this.getMountPointElement()) {
-      debug(`Mount point element is not found`);
+      this.logger.debug(`Mount point element is not found`);
       return this;
     }
 
-    void await config.load();
+    void await this.config.load();
 
     const url = document.location.href;
 
-    if (!config.isHostConfigured(url)) {
-      debug(`Host is not configured`, url);
+    if (!this.config.isHostConfigured(url)) {
+      this.logger.debug(`Host is not configured`, url);
       return this;
     }
 
     const fileActionsPanel = document.querySelector<HTMLElement>(SELECTOR_FILE_ACTIONS);
 
     if (!fileActionsPanel) {
-      debug(`div.file-actions panel not found`);
+      this.logger.debug(`div.file-actions panel not found`);
       return this;
     }
 
     if (fileActionsPanel.getAttribute(WATCHDOG_FLAG) == "true") {
-      debug(`Nothing to do: logic is already injected to that page`);
+      this.logger.debug(`Nothing to do: logic is already injected to that page`);
       return this;
     }
 
     const refDropdown = document.querySelector<HTMLElement>(SELECTOR_REF_DROPDOWN);
     if (!refDropdown) {
-      debug(`Page structure is not ready yet: ref-name dropdown is not found`);
+      this.logger.debug(`Page structure is not ready yet: ref-name dropdown is not found`);
       return this;
     }
 
 
     const buttonsGroup = document.querySelector<HTMLElement>(SELECTOR_BUTTONS);
     if (!buttonsGroup) {
-      debug(`Page structure is not ready yet: file-actions panel is not found`);
+      this.logger.debug(`Page structure is not ready yet: file-actions panel is not found`);
       return this;
     }
 
     const fileContent = document.querySelector<HTMLElement>(SELECTOR_FILE_CONTENT);
     if (!fileContent) {
-      debug(`Page structure is not ready yet: file content div is not found`);
+      this.logger.debug(`Page structure is not ready yet: file content div is not found`);
       return this;
     }
 
@@ -85,7 +84,7 @@ export class BlobPageLogic extends DeferredMountPointExecutor {
 
     const rawContent = await fetchFileRaw(
       origin,
-      config.getToken(url),
+      this.config.getToken(url),
       repoPath,
       refName,
       filePath
@@ -140,9 +139,9 @@ export class BlobPageLogic extends DeferredMountPointExecutor {
       await viewer.importXML(rawContent);
       const canvas = viewer.get("canvas") as { zoom: (mode: string) => void };
       canvas.zoom("fit-viewport");
-      debug(`BPMN rendered successfully`);
+      this.logger.debug(`BPMN rendered successfully`);
     } catch (err) {
-      debug("Failed to render BPMN", err);
+      this.logger.debug("Failed to render BPMN", err);
       fileContent.innerHTML = originalContent;
       fileContent.style.display = originalDisplay;
       throw err;

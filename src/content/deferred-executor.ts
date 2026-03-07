@@ -1,9 +1,10 @@
-import { debug } from "@/lib/logger";
+import { Logger } from "@/lib/logger";
 import { getRandomString } from "@/lib/utils";
 
 export abstract class DeferredMountPointExecutor {
 
     private mountPointObserver?: MutationObserver;
+    protected logger:Logger;
 
     /**
      * Execution of business logic of the content script bound to mountPointSelector
@@ -12,14 +13,16 @@ export abstract class DeferredMountPointExecutor {
 
     protected mountPointSelector: string;
 
-    constructor(mountPointSelector: string) {
+    constructor(mountPointSelector: string, logger:Logger) {
         this.mountPointSelector = mountPointSelector;
+        this.logger = logger;
+
         const element = document.querySelector(this.mountPointSelector);
         if (!element) {
-            debug(`Mount point is not found during content script initialization`);
+            this.logger.debug(`Mount point is not found during content script initialization`);
             this.makeBodyObserver(); // wait until the mount point appears
         } else {
-            debug(`Mount point found during content script initialization`);
+            this.logger.debug(`Mount point found during content script initialization`);
             this.execute()
                 .then(() => {
                     if (!this.mountPointObserver)
@@ -30,19 +33,19 @@ export abstract class DeferredMountPointExecutor {
 
     makeMountPointObserver(mountPointElement: Element) {
         const instanceId = getRandomString(8);
-        debug(`Creating new mount point observer [${instanceId}]`);
+        this.logger.debug(`Creating new mount point observer [${instanceId}]`);
         
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
         this.mountPointObserver = new MutationObserver(async (_, obs: MutationObserver) => {
             const element = document.querySelector(this.mountPointSelector);
             if (element) {
-                debug(`Triggering execution in mount point observer [${instanceId}]`);
+                this.logger.debug(`Triggering execution in mount point observer [${instanceId}]`);
                 void await this.execute();
             }
             else { // element existed but disappeared
                 obs.disconnect();
-                debug(`Mount point element observer has disconnected itself [${instanceId}]`);
+                this.logger.debug(`Mount point element observer has disconnected itself [${instanceId}]`);
                 self.makeBodyObserver();
             }
         });
@@ -50,20 +53,20 @@ export abstract class DeferredMountPointExecutor {
             childList: true,
             subtree: true
         });
-        debug(`Mount point element observer is set up to re-inject logic if something changed in ${this.mountPointSelector} [${instanceId}]`);
+        this.logger.debug(`Mount point element observer is set up to re-inject logic if something changed in ${this.mountPointSelector} [${instanceId}]`);
     }
     private makeBodyObserver() {
         const instanceId = getRandomString(8);
-        debug(`Creating new body observer [${instanceId}]`);
+        this.logger.debug(`Creating new body observer [${instanceId}]`);
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
         const observer = new MutationObserver(async (_, obs: MutationObserver) => {
-            debug(`Searching for mount point in body observer [${instanceId}]`);
+            this.logger.debug(`Searching for mount point in body observer [${instanceId}]`);
             const element = document.querySelector(self.mountPointSelector);
             if (!element)
                 return;
             obs.disconnect(); // once the mount point element exists, body observer is no longer needed
-            debug(`Mount point found, body element observer is disconnected [${instanceId}]`);
+            this.logger.debug(`Mount point found, body element observer is disconnected [${instanceId}]`);
             
             void await self.execute();
             if (!self.mountPointObserver)
@@ -74,7 +77,7 @@ export abstract class DeferredMountPointExecutor {
             childList: true,
             subtree: true
         });
-        debug(`Body element observer is set up to wait for [${this.mountPointSelector}] [${instanceId}]`);
+        this.logger.debug(`Body element observer is set up to wait for [${this.mountPointSelector}] [${instanceId}]`);
     }
     protected getMountPointElement() {
         return document.querySelector(this.mountPointSelector);
@@ -85,6 +88,6 @@ export abstract class DeferredMountPointExecutor {
             this.mountPointObserver.disconnect()
             this.mountPointObserver = undefined;
         }
-        debug(`Mount point observer stopped`);
+        this.logger.debug(`Mount point observer stopped`);
     }
 }

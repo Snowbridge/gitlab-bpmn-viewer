@@ -1,4 +1,3 @@
-import { debug } from "./logger";
 
 export async function fetchFileRaw(
   origin: string,
@@ -9,7 +8,6 @@ export async function fetchFileRaw(
 ): Promise<string> {
   const base = origin.replace(/\/$/, "");
   const url = `${base}/api/v4/projects/${encodeURIComponent(projectPath)}/repository/files/${encodeURIComponent(filePath)}/raw?ref=${encodeURIComponent(ref)}`;
-  debug(`Fetching file content`, projectPath, filePath, ref)
   const response = await fetch(url, {
     headers: {
       "PRIVATE-TOKEN": token,
