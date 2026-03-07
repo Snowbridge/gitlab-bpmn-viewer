@@ -108,8 +108,9 @@ async function checkUrlAndSendMessage(
 /**
  * Runs the background script: registers listeners and initializes the icon updater.
  * Accepts browser API and config as parameters for testability.
+ * Exported for unit tests.
  */
-async function runBackgroundScript(browserApi: BrowserApi, config: BackgroundConfig): Promise<void> {
+export async function runBackgroundScript(browserApi: BrowserApi, config: BackgroundConfig): Promise<void> {
   browserApi.tabs.onActivated.addListener(async (activeInfo) => {
     const tab = await browserApi.tabs.get(activeInfo.tabId);
     if (tab && tab.url) {
