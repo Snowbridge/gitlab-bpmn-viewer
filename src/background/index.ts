@@ -3,11 +3,15 @@ import { debug } from "@/lib/logger";
 import urlMessageResolver from "@/lib/url-message-resolver";
 import browser from "webextension-polyfill";
 import { ContextualIconUpdater } from "./contextual-icon-updater";
+import type { BrowserApi, StorageChangeRecord } from "../types/types";
 import { MESSAGE_TYPE_CONFIG_CHANGED } from "@/types/messages";
 
-const config = new BackgroundConfig();
-
-async function ensureContentScriptInjected(tabId: number, url: string): Promise<boolean> {
+async function ensureContentScriptInjected(
+  browserApi: BrowserApi,
+  config: BackgroundConfig,
+  tabId: number,
+  url: string
+): Promise<boolean> {
   await config.load();
   if (!config.isHostConfigured(url)) return false;
 
@@ -16,7 +20,7 @@ async function ensureContentScriptInjected(tabId: number, url: string): Promise<
   // Inject it manually when needed.
   try {
     // In the built extension this file becomes `src/content/index.js`.
-    await browser.scripting.executeScript({
+    await browserApi.scripting.executeScript({
       target: { tabId },
       files: ["src/content/index.js"],
     });
@@ -34,6 +38,8 @@ async function ensureContentScriptInjected(tabId: number, url: string): Promise<
  * The "Receiving end does not exist" error is suppressed and logged as debug.
  */
 async function checkUrlAndSendMessage(
+  browserApi: BrowserApi,
+  config: BackgroundConfig,
   tabId: number,
   url: string,
   eventSource: string
@@ -52,7 +58,7 @@ async function checkUrlAndSendMessage(
   debug(`Sending message to foreground on [${eventSource}]`, url);
 
   try {
-    await browser.tabs.sendMessage(tabId, {
+    await browserApi.tabs.sendMessage(tabId, {
       type: message,
       url: url,
       eventSource: eventSource,
@@ -68,10 +74,10 @@ async function checkUrlAndSendMessage(
       );
 
       // Self-healing: inject the content script and retry exactly once.
-      const injected = await ensureContentScriptInjected(tabId, url);
+      const injected = await ensureContentScriptInjected(browserApi, config, tabId, url);
       if (injected) {
         try {
-          await browser.tabs.sendMessage(tabId, {
+          await browserApi.tabs.sendMessage(tabId, {
             type: message,
             url: url,
             eventSource: `${eventSource}[afterInject]`,
@@ -100,71 +106,78 @@ async function checkUrlAndSendMessage(
 }
 
 /**
- * Global subscriptions that trigger sending a message to the content script.
+ * Runs the background script: registers listeners and initializes the icon updater.
+ * Accepts browser API and config as parameters for testability.
  */
-browser.tabs.onActivated.addListener(async (activeInfo) => {
-  const tab = await browser.tabs.get(activeInfo.tabId);
-  if (tab && tab.url) {
-    void checkUrlAndSendMessage(activeInfo.tabId, tab.url, "onActivated");
-  }
-});
-
-browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url) {
-    void checkUrlAndSendMessage(tabId, tab.url, "onUpdated[Complete]");
-  }
-});
-
-browser.webNavigation.onCommitted.addListener(
-  (details) => {
-    if (details.tabId && details.url) {
-      void checkUrlAndSendMessage(details.tabId, details.url, "onCommitted");
+async function runBackgroundScript(browserApi: BrowserApi, config: BackgroundConfig): Promise<void> {
+  browserApi.tabs.onActivated.addListener(async (activeInfo) => {
+    const tab = await browserApi.tabs.get(activeInfo.tabId);
+    if (tab && tab.url) {
+      void checkUrlAndSendMessage(browserApi, config, activeInfo.tabId, tab.url, "onActivated");
     }
-  },
-  { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
-);
+  });
 
-browser.webNavigation.onHistoryStateUpdated.addListener(
-  (details) => {
-    if (details.tabId && details.url) {
-      void checkUrlAndSendMessage(
-        details.tabId,
-        details.url,
-        "onHistoryStateUpdated"
-      );
+  browserApi.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === "complete" && tab.url) {
+      void checkUrlAndSendMessage(browserApi, config, tabId, tab.url, "onUpdated[Complete]");
     }
-  },
-  { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
-);
+  });
 
-browser.storage.onChanged.addListener(async (_changes: Record<string, browser.Storage.StorageChange>, areaName: string) => {
-  if (areaName === "local") {
-    const [tab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+  browserApi.webNavigation.onCommitted.addListener(
+    (details) => {
+      if (details.tabId && details.url) {
+        void checkUrlAndSendMessage(browserApi, config, details.tabId, details.url, "onCommitted");
+      }
+    },
+    { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
+  );
 
-    if (!tab || !tab.url || !tab.id)
-      return;
+  browserApi.webNavigation.onHistoryStateUpdated.addListener(
+    (details) => {
+      if (details.tabId && details.url) {
+        void checkUrlAndSendMessage(
+          browserApi,
+          config,
+          details.tabId,
+          details.url,
+          "onHistoryStateUpdated"
+        );
+      }
+    },
+    { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
+  );
 
-    const isResolved = urlMessageResolver(tab.url);
-    if (isResolved) {
-      debug("Relaying config changed event to foreground", tab.url);
-      try {
-        void await browser.tabs.sendMessage(tab.id, {
-          type: MESSAGE_TYPE_CONFIG_CHANGED,
-          url: tab.url,
+  browserApi.storage.onChanged.addListener(
+    async (_changes: StorageChangeRecord, areaName: string) => {
+      if (areaName === "local") {
+        const [tab] = await browserApi.tabs.query({
+          active: true,
+          currentWindow: true,
         });
-      } catch {
-        /* nothing: there's no content-script on the tab, so no need to update config either */
+
+        if (!tab || !tab.url || !tab.id)
+          return;
+
+        const isResolved = urlMessageResolver(tab.url);
+        if (isResolved) {
+          debug("Relaying config changed event to foreground", tab.url);
+          try {
+            void await browserApi.tabs.sendMessage(tab.id, {
+              type: MESSAGE_TYPE_CONFIG_CHANGED,
+              url: tab.url,
+            });
+          } catch {
+            /* nothing: there's no content-script on the tab, so no need to update config either */
+          }
+        }
       }
     }
-  }
-});
+  );
 
-async function initBackgroundScript() {
   await config.load();
-  await new ContextualIconUpdater(config).init();
+  await new ContextualIconUpdater(config, browserApi).init();
+  
 }
 
-void initBackgroundScript();
+const config = new BackgroundConfig();
+runBackgroundScript(browser, config);

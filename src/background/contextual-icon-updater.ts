@@ -1,6 +1,13 @@
 import { BackgroundConfig } from "@/lib/configuration";
 import { debug } from "@/lib/logger";
-import browser from "webextension-polyfill";
+import type {
+  BrowserApi,
+  RuntimeOnInstalledDetailsType,
+  StorageChangeRecord,
+  TabsOnActivatedActiveInfoType,
+  TabsOnUpdatedChangeInfoType,
+  TabsTab,
+} from "../types/types";
 
 const ICON_ENABLED = "/icons/icon16.png";
 const ICON_DISABLED = "/icons/icon16gray.png";
@@ -9,8 +16,11 @@ function emptyWatchdogHandler(){/* empty by purpose */}
 
 export class ContextualIconUpdater {
     private config: BackgroundConfig;
-    constructor(config: BackgroundConfig){
+    private browserApi: BrowserApi;
+
+    constructor(config: BackgroundConfig, browserApi: BrowserApi){
         this.config = config;
+        this.browserApi = browserApi;
         this.subscribeListeners();
     }
 
@@ -18,36 +28,36 @@ export class ContextualIconUpdater {
 
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
-        if(!browser.tabs.onUpdated.hasListener(emptyWatchdogHandler)){
-            browser.tabs.onUpdated.addListener(emptyWatchdogHandler);
-            browser.tabs.onUpdated.addListener(async (tabId: number, _changeInfo: browser.Tabs.OnUpdatedChangeInfoType, tab: browser.Tabs.Tab) => {
+        if(!this.browserApi.tabs.onUpdated.hasListener(emptyWatchdogHandler)){
+            this.browserApi.tabs.onUpdated.addListener(emptyWatchdogHandler);
+            this.browserApi.tabs.onUpdated.addListener(async (tabId: number, _changeInfo: TabsOnUpdatedChangeInfoType, tab: TabsTab) => {
                 debug(`ContextualIconUpdater.onUpdated is called`, tabId, tab.url);
                 void await self.updateIconForTab(tabId, tab.url);
             });
         }
             
-        if(!browser.tabs.onActivated.hasListener(emptyWatchdogHandler)){
-            browser.tabs.onActivated.addListener(emptyWatchdogHandler);
-            browser.tabs.onActivated.addListener(async (activeInfo: browser.Tabs.OnActivatedActiveInfoType) => {
+        if(!this.browserApi.tabs.onActivated.hasListener(emptyWatchdogHandler)){
+            this.browserApi.tabs.onActivated.addListener(emptyWatchdogHandler);
+            this.browserApi.tabs.onActivated.addListener(async (activeInfo: TabsOnActivatedActiveInfoType) => {
                 debug(`ContextualIconUpdater.tabs.onActivated is called`, activeInfo);
                 const execute = (tab: { url?: string }) => { void self.updateIconForTab(activeInfo.tabId, tab.url) };
-                browser.tabs
+                this.browserApi.tabs
                     .get(activeInfo.tabId)
                     .then(execute, execute);
             });
         }
             
-        if(!browser.runtime.onInstalled.hasListener(emptyWatchdogHandler)){
-            browser.runtime.onInstalled.addListener(emptyWatchdogHandler);
-            browser.runtime.onInstalled.addListener(async (details: browser.Runtime.OnInstalledDetailsType) => {
+        if(!this.browserApi.runtime.onInstalled.hasListener(emptyWatchdogHandler)){
+            this.browserApi.runtime.onInstalled.addListener(emptyWatchdogHandler);
+            this.browserApi.runtime.onInstalled.addListener(async (details: RuntimeOnInstalledDetailsType) => {
                 debug(`ContextualIconUpdater.runtime.onInstalled by ${details.reason}`);
                 void await self.init();
             });
         }
             
-        if(!browser.storage.onChanged.hasListener(emptyWatchdogHandler)){
-            browser.storage.onChanged.addListener(emptyWatchdogHandler);
-            browser.storage.onChanged.addListener(async (_changes: Record<string, browser.Storage.StorageChange>, areaName: string) => {
+        if(!this.browserApi.storage.onChanged.hasListener(emptyWatchdogHandler)){
+            this.browserApi.storage.onChanged.addListener(emptyWatchdogHandler);
+            this.browserApi.storage.onChanged.addListener(async (_changes: StorageChangeRecord, areaName: string) => {
                 if (areaName === "local") {
                     debug(`ContextualIconUpdater.storage.onChanged: Settings are changed`, _changes);
                     void await self.init()
@@ -71,13 +81,13 @@ export class ContextualIconUpdater {
         if (isHostConfigured)
             path = ICON_ENABLED;
 
-        await browser.action.setIcon({ tabId, path });
+        await this.browserApi.action.setIcon({ tabId, path });
         debug(`The icon is set to ${path}`);
     }
 
     // Request current tab and update icon, if successful
     async init(){
-        const [tab] = await browser.tabs.query({
+        const [tab] = await this.browserApi.tabs.query({
             active: true,
             currentWindow: true,
         });
