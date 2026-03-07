@@ -3,6 +3,7 @@ import { DeferredMountPointExecutor } from "./deferred-executor";
 import { ForegroundConfig } from "@/lib/configuration";
 import { fetchFileRaw, getMergeRequestRefs } from "@/lib/gitlab-api";
 import { createIconButton, CSS_CLASS_DIAGRAM_BUTTON, openDiagramModalWithContent, showWarning } from "@/lib/html-utils";
+import browser from "webextension-polyfill";
 
 const WATCHDOG_FLAG = `gl-bpmn-viewer-is-injected` as const;
 const SELECTOR_FILE_ACTIONS
@@ -10,7 +11,7 @@ const SELECTOR_FILE_ACTIONS
 
 const PATHNAME_REGEXP = new RegExp(`/(.*)/-/merge_requests/(\\d+)/diffs`, 'i');
 
-const config = new ForegroundConfig();
+const config = new ForegroundConfig(browser);
 config.load();
 
 // Track for which files (data-path) the button has already been added

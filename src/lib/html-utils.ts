@@ -62,7 +62,7 @@ export function showWarning(message: string): void {
  * @param diagramBtn — button (not used for closing, kept for consistency).
  */
 export function openDiagramModalWithContent(
-  diagramBtn: HTMLElement,
+  _diagramBtn: HTMLElement,
   from: string,
   to: string
 ): void {

@@ -4,6 +4,7 @@ import { ForegroundConfig } from "@/lib/configuration";
 import { fetchFileRaw } from "@/lib/gitlab-api";
 import NavigatedViewer from "bpmn-js/lib/NavigatedViewer";
 import { createIconButton } from "@/lib/html-utils";
+import browser from "webextension-polyfill";
 
 const WATCHDOG_FLAG = `gl-bpmn-viewer-is-injected` as const;
 const SELECTOR_FILE_ACTIONS = `div.file-actions` as const;
@@ -11,7 +12,7 @@ const SELECTOR_BUTTONS = `#fileHolder div.file-actions > :last-child` as const;
 const SELECTOR_FILE_CONTENT = `#fileHolder .file-content.code.blob-content` as const;
 const SELECTOR_REF_DROPDOWN = `div.tree-ref-holder > div.ref-selector > button > span > span` as const;
 
-const config = new ForegroundConfig();
+const config = new ForegroundConfig(browser);
 config.load();
 
 export class BlobPageLogic extends DeferredMountPointExecutor {

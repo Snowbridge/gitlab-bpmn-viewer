@@ -1,5 +1,5 @@
 import { BackgroundConfig } from "@/lib/configuration";
-import { debug } from "@/lib/logger";
+import { Logger } from "@/lib/logger";
 import urlMessageResolver from "@/lib/url-message-resolver";
 import browser from "webextension-polyfill";
 import { ContextualIconUpdater } from "./contextual-icon-updater";
@@ -10,7 +10,8 @@ async function ensureContentScriptInjected(
   browserApi: BrowserApi,
   config: BackgroundConfig,
   tabId: number,
-  url: string
+  url: string,
+  logger: Logger
 ): Promise<boolean> {
   await config.load();
   if (!config.isHostConfigured(url)) return false;
@@ -27,7 +28,7 @@ async function ensureContentScriptInjected(
     return true;
   } catch (error: unknown) {
     const msg = (error as Error)?.message ?? String(error);
-    debug("Unable to inject content script via scripting.executeScript", tabId, url, msg);
+    logger.debug("Unable to inject content script via scripting.executeScript", tabId, url, msg);
     return false;
   }
 }
@@ -42,7 +43,8 @@ async function checkUrlAndSendMessage(
   config: BackgroundConfig,
   tabId: number,
   url: string,
-  eventSource: string
+  eventSource: string,
+  logger: Logger
 ) {
   await config.load();
   if (!config.isHostConfigured(url)) {
@@ -51,11 +53,11 @@ async function checkUrlAndSendMessage(
 
   const message = urlMessageResolver(url);
   if (!message) {
-    debug(`Message ID is not resolved from URL`, url);
+    logger.debug(`Message ID is not resolved from URL`, url);
     return;
   }
 
-  debug(`Sending message to foreground on [${eventSource}]`, url);
+  logger.debug(`Sending message to foreground on [${eventSource}]`, url);
 
   try {
     await browserApi.tabs.sendMessage(tabId, {
@@ -66,7 +68,7 @@ async function checkUrlAndSendMessage(
   } catch (error: unknown) {
     const msg = (error as Error)?.message ?? String(error);
     if (msg.includes("Could not establish connection. Receiving end does not exist")) {
-      debug(
+      logger.debug(
         "Content script is not ready yet while sending message to foreground",
         tabId,
         url,
@@ -74,7 +76,7 @@ async function checkUrlAndSendMessage(
       );
 
       // Self-healing: inject the content script and retry exactly once.
-      const injected = await ensureContentScriptInjected(browserApi, config, tabId, url);
+      const injected = await ensureContentScriptInjected(browserApi, config, tabId, url, logger);
       if (injected) {
         try {
           await browserApi.tabs.sendMessage(tabId, {
@@ -84,7 +86,7 @@ async function checkUrlAndSendMessage(
           });
         } catch (retryError: unknown) {
           const retryMsg = (retryError as Error)?.message ?? String(retryError);
-          debug(
+          logger.debug(
             "Retry sendMessage failed after content script injection",
             tabId,
             url,
@@ -94,7 +96,7 @@ async function checkUrlAndSendMessage(
         }
       }
     } else {
-      debug(
+      logger.debug(
         "Unexpected error while sending message to foreground",
         tabId,
         url,
@@ -110,24 +112,24 @@ async function checkUrlAndSendMessage(
  * Accepts browser API and config as parameters for testability.
  * Exported for unit tests.
  */
-export async function runBackgroundScript(browserApi: BrowserApi, config: BackgroundConfig): Promise<void> {
+export async function runBackgroundScript(browserApi: BrowserApi, config: BackgroundConfig, logger: Logger): Promise<void> {
   browserApi.tabs.onActivated.addListener(async (activeInfo) => {
     const tab = await browserApi.tabs.get(activeInfo.tabId);
     if (tab && tab.url) {
-      void checkUrlAndSendMessage(browserApi, config, activeInfo.tabId, tab.url, "onActivated");
+      void checkUrlAndSendMessage(browserApi, config, activeInfo.tabId, tab.url, "onActivated", logger);
     }
   });
 
   browserApi.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === "complete" && tab.url) {
-      void checkUrlAndSendMessage(browserApi, config, tabId, tab.url, "onUpdated[Complete]");
+      void checkUrlAndSendMessage(browserApi, config, tabId, tab.url, "onUpdated[Complete]", logger);
     }
   });
 
   browserApi.webNavigation.onCommitted.addListener(
     (details) => {
       if (details.tabId && details.url) {
-        void checkUrlAndSendMessage(browserApi, config, details.tabId, details.url, "onCommitted");
+        void checkUrlAndSendMessage(browserApi, config, details.tabId, details.url, "onCommitted", logger);
       }
     },
     { url: [{ urlContains: "/-/blob/" }, { urlContains: "/-/merge_requests/" }] }
@@ -141,7 +143,8 @@ export async function runBackgroundScript(browserApi: BrowserApi, config: Backgr
           config,
           details.tabId,
           details.url,
-          "onHistoryStateUpdated"
+          "onHistoryStateUpdated",
+          logger
         );
       }
     },
@@ -161,7 +164,7 @@ export async function runBackgroundScript(browserApi: BrowserApi, config: Backgr
 
         const isResolved = urlMessageResolver(tab.url);
         if (isResolved) {
-          debug("Relaying config changed event to foreground", tab.url);
+          logger.debug("Relaying config changed event to foreground", tab.url);
           try {
             void await browserApi.tabs.sendMessage(tab.id, {
               type: MESSAGE_TYPE_CONFIG_CHANGED,
@@ -180,5 +183,7 @@ export async function runBackgroundScript(browserApi: BrowserApi, config: Backgr
   
 }
 
-const config = new BackgroundConfig();
-runBackgroundScript(browser, config);
+
+const config = new BackgroundConfig(browser);
+const logger = new Logger(config);
+runBackgroundScript(browser, config, logger);

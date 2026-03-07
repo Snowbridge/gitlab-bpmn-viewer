@@ -1,4 +1,5 @@
 import { debug } from "@/lib/logger";
+import { getRandomString } from "@/lib/utils";
 
 export abstract class DeferredMountPointExecutor {
 
@@ -28,7 +29,7 @@ export abstract class DeferredMountPointExecutor {
     }
 
     makeMountPointObserver(mountPointElement: Element) {
-        const instanceId = Math.random().toString(36).substring(2, 10);
+        const instanceId = getRandomString(8);
         debug(`Creating new mount point observer [${instanceId}]`);
         
         // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -52,7 +53,7 @@ export abstract class DeferredMountPointExecutor {
         debug(`Mount point element observer is set up to re-inject logic if something changed in ${this.mountPointSelector} [${instanceId}]`);
     }
     private makeBodyObserver() {
-        const instanceId = Math.random().toString(36).substring(2, 10);
+        const instanceId = getRandomString(8);
         debug(`Creating new body observer [${instanceId}]`);
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;

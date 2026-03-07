@@ -9,7 +9,7 @@ import { debug } from "@/lib/logger";
 
 function emptyWatchdogHandler() {/* empty by purpose */ }
 
-const config = new ForegroundConfig();
+const config = new ForegroundConfig(browser);
 config.load();
 
 // Singleton is needed only for diff pages to avoid multiplying observers

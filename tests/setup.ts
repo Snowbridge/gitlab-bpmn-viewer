@@ -34,3 +34,19 @@ vi.mock("@/lib/configuration", () => ({
     isDebugStackIncluded: vi.fn().mockReturnValue(false),
   })),
 }));
+/*
+class MockConfig extends BaseConfig {
+  constructor(browserApi: BrowserApi) {
+      super(browserApi);
+      this.update([
+          {
+              host: 'git.example.com',
+              token: getRandomString(32)
+          }
+      ], true, false);
+  }
+  protected subscribeListeners(): void {
+      throw new Error("Method not implemented.");
+  }
+}
+  */
