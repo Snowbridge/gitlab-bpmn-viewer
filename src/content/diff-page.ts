@@ -82,18 +82,16 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
         for (const fileActionsPanel of unprocessedPanels) {
             const grandParentElement = fileActionsPanel.parentElement?.parentElement;
             const dataPath = grandParentElement?.getAttribute('data-path')
-            if (!grandParentElement || !dataPath)
-                throw Error(`Page structure is corrupt, can't locate a corresponding div with 'data-path' attribute`);
-
-            // If a button for the given data-path has already been added (for example,
-            // there are several panels for the same file), we just mark the panel
-            // as processed and skip inserting a new button. As a result, there will be
-            // no more than one button per .bpmn on the page.
-            if (processedDiffPaths.has(dataPath)) {
-                debug(`Diagram button for ${dataPath} already exists, marking panel as processed without adding a new button`);
-                fileActionsPanel.setAttribute(WATCHDOG_FLAG, "true");
+            if (!grandParentElement || !dataPath){
+                debug(`Page structure is corrupt, can't locate a corresponding div with 'data-path' attribute`);
                 continue;
             }
+
+            const watchDog = fileActionsPanel.getAttribute(WATCHDOG_FLAG) ?? "false";
+            if (watchDog == "true"){
+                debug(`Unprocessed panel has a watchdog flag. It probably means that there are more then one mount point observer running in parallel, which is not suppose to happen`);
+                continue;
+            } 
 
             debug(`Creating diagram button for ${dataPath}`);
 
@@ -117,12 +115,11 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
             fileActionsPanel.insertBefore(diagramBtn, fileActionsPanel.firstChild);
             fileActionsPanel.setAttribute(WATCHDOG_FLAG, "true");
             processedDiffPaths.add(dataPath);
+            fileActionsPanel.setAttribute(WATCHDOG_FLAG, "true");
             debug(`Button has been inserted in DOM`);
         }
-        /*
 
-        this.makeMountPointObserver(mountPointElement); // on dynamic loading in large MRs new SELECTOR_FILE_ACTIONS may appear
-        */
+        this.makeMountPointObserver(mountPointElement); // on dynamic loading in large MRs new SELECTOR_FILE_ACTIONS may appear after the execute()
         return this;
     }
 
