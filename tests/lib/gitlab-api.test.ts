@@ -64,14 +64,14 @@ describe("gitlab-api", () => {
   });
 
   describe("getMergeRequestRefs", () => {
-    it("returns source and target from diff_refs when present", async () => {
+    it("returns branch names and diff_refs shas", async () => {
       const mockFetch = vi.mocked(fetch);
       mockFetch.mockResolvedValue({
         ok: true,
         json: () =>
           Promise.resolve({
-            source_branch: "main",
-            target_branch: "feature",
+            source_branch: "feature",
+            target_branch: "main",
             diff_refs: {
               base_sha: "aaa",
               start_sha: "startSha",
@@ -87,17 +87,27 @@ describe("gitlab-api", () => {
         "1"
       );
 
-      expect(result).toEqual({ source: "startSha", target: "headSha" });
+      expect(result).toEqual({
+        source: "feature",
+        target: "main",
+        baseSha: "aaa",
+        headSha: "headSha",
+      });
     });
 
-    it("falls back to source_branch and target_branch when no diff_refs", async () => {
+    it("maps another MR response shape consistently", async () => {
       const mockFetch = vi.mocked(fetch);
       mockFetch.mockResolvedValue({
         ok: true,
         json: () =>
           Promise.resolve({
-            source_branch: "main",
-            target_branch: "feature",
+            source_branch: "topic",
+            target_branch: "develop",
+            diff_refs: {
+              base_sha: "b1",
+              start_sha: "s1",
+              head_sha: "h1",
+            },
           }),
       } as Response);
 
@@ -108,14 +118,24 @@ describe("gitlab-api", () => {
         "2"
       );
 
-      expect(result).toEqual({ source: "main", target: "feature" });
+      expect(result).toEqual({
+        source: "topic",
+        target: "develop",
+        baseSha: "b1",
+        headSha: "h1",
+      });
     });
 
     it("builds correct MR API URL", async () => {
       const mockFetch = vi.mocked(fetch);
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ source_branch: "a", target_branch: "b" }),
+        json: () =>
+          Promise.resolve({
+            source_branch: "a",
+            target_branch: "b",
+            diff_refs: { base_sha: "x", start_sha: "y", head_sha: "z" },
+          }),
       } as Response);
 
       await getMergeRequestRefs(

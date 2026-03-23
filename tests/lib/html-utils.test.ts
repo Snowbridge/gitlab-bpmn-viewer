@@ -15,7 +15,7 @@ vi.mock("webextension-polyfill", () => ({
 }));
 
 vi.mock("@/content/diff-modal.html?raw", () => ({
-  default: `<div class="gl-bpmn-diff-modal-overlay"><button type="button" class="gl-bpmn-diff-modal-close" aria-label="Закрыть">×</button></div>`,
+  default: `<div class="gl-bpmn-diff-modal-overlay"><button type="button" class="gl-bpmn-diff-modal-close" aria-label="Закрыть">×</button><h2 id="version-base-label"></h2><h2 id="version-head-label"></h2></div>`,
 }));
 
 describe("html-utils", () => {
@@ -68,15 +68,21 @@ describe("html-utils", () => {
 
   describe("openDiagramModalWithContent", () => {
     const DIFF_APPLY_EVENT = "gl-bpmn-diff-apply";
+    const sampleMrRefs = {
+      source: "feature/x",
+      target: "main",
+      baseSha: "b",
+      headSha: "h",
+    } as const;
 
     beforeEach(() => {
       document.body.innerHTML = "";
       document.head.innerHTML = "";
     });
 
-    it("appends overlay to body and injects script with from/to", () => {
+    it("appends overlay to body and injects diff-app script", () => {
       const btn = document.createElement("button");
-      openDiagramModalWithContent(btn, "<source/>", "<target/>");
+      openDiagramModalWithContent(btn, "<source/>", "<target/>", sampleMrRefs);
 
       const overlay = document.body.querySelector(".gl-bpmn-diff-modal-overlay");
       expect(overlay).toBeTruthy();
@@ -87,24 +93,35 @@ describe("html-utils", () => {
       expect(script?.async).toBe(true);
     });
 
-    it("dispatches DIFF_APPLY_EVENT with from and to when script onload fires", () => {
+    it("sets version labels from mrRefs.target (base) and mrRefs.source (head)", () => {
       const btn = document.createElement("button");
-      let receivedDetail: { from: string; to: string } | null = null;
+      openDiagramModalWithContent(btn, "a", "b", sampleMrRefs);
+
+      expect(document.querySelector("#version-base-label")?.textContent).toBe("main");
+      expect(document.querySelector("#version-head-label")?.textContent).toBe("feature/x");
+    });
+
+    it("dispatches DIFF_APPLY_EVENT with head and base XML when script onload fires", () => {
+      const btn = document.createElement("button");
+      let receivedDetail: { fileVersionHead: string; fileVersionBase: string } | null = null;
       document.addEventListener(DIFF_APPLY_EVENT, ((e: CustomEvent) => {
         receivedDetail = e.detail;
       }) as EventListener);
 
-      openDiagramModalWithContent(btn, "<xml-a/>", "<xml-b/>");
+      openDiagramModalWithContent(btn, "<xml-a/>", "<xml-b/>", sampleMrRefs);
 
       const script = document.body.querySelector(".gl-bpmn-diff-modal-overlay script");
       expect(script).toBeTruthy();
       (script as HTMLScriptElement).onload?.({} as Event);
-      expect(receivedDetail).toEqual({ from: "<xml-a/>", to: "<xml-b/>" });
+      expect(receivedDetail).toEqual({
+        fileVersionHead: "<xml-a/>",
+        fileVersionBase: "<xml-b/>",
+      });
     });
 
     it("closes modal when overlay is clicked", () => {
       const btn = document.createElement("button");
-      openDiagramModalWithContent(btn, "a", "b");
+      openDiagramModalWithContent(btn, "a", "b", sampleMrRefs);
 
       const overlay = document.body.querySelector(".gl-bpmn-diff-modal-overlay") as HTMLElement;
       expect(overlay).toBeTruthy();
@@ -114,7 +131,7 @@ describe("html-utils", () => {
 
     it("closes modal when close button is clicked", () => {
       const btn = document.createElement("button");
-      openDiagramModalWithContent(btn, "a", "b");
+      openDiagramModalWithContent(btn, "a", "b", sampleMrRefs);
 
       const closeBtn = document.body.querySelector(".gl-bpmn-diff-modal-close") as HTMLElement;
       expect(closeBtn).toBeTruthy();
@@ -124,7 +141,7 @@ describe("html-utils", () => {
 
     it("closes modal on Escape key", () => {
       const btn = document.createElement("button");
-      openDiagramModalWithContent(btn, "a", "b");
+      openDiagramModalWithContent(btn, "a", "b", sampleMrRefs);
 
       expect(document.body.querySelector(".gl-bpmn-diff-modal-overlay")).toBeTruthy();
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));

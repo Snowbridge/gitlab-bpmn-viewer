@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import modalTemplate from '@/content/diff-modal.html?raw';
+import { MergeRequestRefs } from "./gitlab-api";
 
 export const CSS_CLASS_DIAGRAM_BUTTON = `gl-bpmn-viewer-diagram-button` as const;
 
@@ -62,8 +63,9 @@ export function showWarning(message: string): void {
  */
 export function openDiagramModalWithContent(
   _diagramBtn: HTMLElement,
-  from: string,
-  to: string
+  fileVersionHead: string,
+  fileVersionBase: string,
+  mrRefs: MergeRequestRefs
 ): void {
 
   const wrap = document.createElement("div");
@@ -91,6 +93,11 @@ export function openDiagramModalWithContent(
   closeBtn?.addEventListener("click", close);
   document.addEventListener("keydown", onEscape);
 
+  const baseLabel = overlayEl.querySelector("#version-base-label");
+  if (baseLabel) baseLabel.textContent = mrRefs.target;
+  const headLabel = overlayEl.querySelector("#version-head-label");
+  if (headLabel) headLabel.textContent = mrRefs.source;
+
   document.body.appendChild(overlayEl);
 
   injectDiffApplyBridge();
@@ -100,7 +107,7 @@ export function openDiagramModalWithContent(
   script.async = true;
   script.onload = (): void => {
     document.dispatchEvent(
-      new CustomEvent(DIFF_APPLY_EVENT, { detail: { from, to } })
+      new CustomEvent(DIFF_APPLY_EVENT, { detail: { fileVersionHead: fileVersionHead, fileVersionBase: fileVersionBase } })
     );
   };
   overlayEl.appendChild(script);

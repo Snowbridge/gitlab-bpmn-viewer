@@ -5,7 +5,12 @@ import type { Logger } from "@/lib/logger";
 
 vi.mock("@/lib/gitlab-api", () => ({
   fetchFileRaw: vi.fn().mockResolvedValue("<bpmn/>"),
-  getMergeRequestRefs: vi.fn().mockResolvedValue({ source: "startSha", target: "headSha" }),
+  getMergeRequestRefs: vi.fn().mockResolvedValue({
+    source: "feature",
+    target: "main",
+    baseSha: "sha-base",
+    headSha: "sha-head",
+  }),
 }));
 
 let lastCreatedDiagramBtn: HTMLButtonElement | null = null;
@@ -107,20 +112,26 @@ describe("DiffPageLogic", () => {
       origin,
       "token",
       "group/repo",
-      "startSha",
+      "sha-head",
       "path/to/file.bpmn"
     );
     expect(fetchFileRaw).toHaveBeenCalledWith(
       origin,
       "token",
       "group/repo",
-      "headSha",
+      "sha-base",
       "path/to/file.bpmn"
     );
     expect(openDiagramModalWithContent).toHaveBeenCalledWith(
       diagramBtn!,
       "<source-bpmn/>",
-      "<target-bpmn/>"
+      "<target-bpmn/>",
+      {
+        source: "feature",
+        target: "main",
+        baseSha: "sha-base",
+        headSha: "sha-head",
+      }
     );
   });
 

@@ -21,9 +21,11 @@ export async function fetchFileRaw(
   return response.text();
 }
 
-interface MergeRequestRefs {
+export interface MergeRequestRefs {
   source: string;
   target: string;
+  baseSha: string;
+  headSha: string;
 }
 
 export async function getMergeRequestRefs(origin: string, token: string, projectPath: string, mrIid: string): Promise<MergeRequestRefs> {
@@ -42,11 +44,13 @@ export async function getMergeRequestRefs(origin: string, token: string, project
   const data = (await response.json()) as {
     source_branch: string;
     target_branch: string;
-    diff_refs?: { base_sha: string; start_sha: string; head_sha: string };
+    diff_refs: { base_sha: string; start_sha: string; head_sha: string };
   };
 
   return {
-    source: data.diff_refs?.start_sha ?? data.source_branch,
-    target: data.diff_refs?.head_sha ?? data.target_branch,
+    source: data.source_branch,
+    target: data.target_branch,
+    baseSha: data.diff_refs.base_sha,
+    headSha: data.diff_refs.head_sha,
   }
 }

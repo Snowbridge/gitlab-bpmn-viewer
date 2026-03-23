@@ -1,7 +1,7 @@
 import { Logger } from "@/lib/logger";
 import { DeferredMountPointExecutor } from "./deferred-executor";
 import { BaseConfig } from "@/lib/configuration";
-import { fetchFileRaw, getMergeRequestRefs } from "@/lib/gitlab-api";
+import { MergeRequestRefs, fetchFileRaw, getMergeRequestRefs } from "@/lib/gitlab-api";
 import { createIconButton, CSS_CLASS_DIAGRAM_BUTTON, openDiagramModalWithContent, showWarning } from "@/lib/html-utils";
 
 const WATCHDOG_FLAG = `gl-bpmn-viewer-is-injected` as const;
@@ -73,9 +73,9 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
         this.stopMountPointObserver(); // there will be modifications below that must not trigger reactions
 
         const origin = document.location.origin;
-        const { source, target } = await getMergeRequestRefs(origin, this.config.getToken(url), repoPath, mrId);
+        const mrRefs = await getMergeRequestRefs(origin, this.config.getToken(url), repoPath, mrId);
 
-        this.logger.debug(`Fetched refs from MR`, source, target);
+        this.logger.debug(`Fetched refs from MR`, mrRefs);
 
         // Add a button to every panel from unprocessedPanels
         for (const fileActionsPanel of unprocessedPanels) {
@@ -102,8 +102,7 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
             diagramBtn.addEventListener("click", () => {
                 onDiagramButtonClick(
                     diagramBtn,
-                    source,
-                    target,
+                    mrRefs,
                     dataPath,
                     origin,
                     this.config.getToken(url),
@@ -125,22 +124,22 @@ export class DiffPageLogic extends DeferredMountPointExecutor {
 }
 
 async function onDiagramButtonClick(
-    diagramBtn: HTMLElement, sourceRef: string, targetRef: string,
+    diagramBtn: HTMLElement, mrRefs: MergeRequestRefs,
     filePath: string, origin: string, token: string,
     projectPath: string
 ) {
-    const [sourceResult, targetResult] = await Promise.allSettled([
-        fetchFileRaw(origin, token, projectPath, sourceRef, filePath),
-        fetchFileRaw(origin, token, projectPath, targetRef, filePath),
+    const [fileVersionHead, fileVersionBase] = await Promise.allSettled([
+        fetchFileRaw(origin, token, projectPath, mrRefs.headSha, filePath),
+        fetchFileRaw(origin, token, projectPath, mrRefs.baseSha, filePath),
     ]);
 
-    [sourceResult, targetResult].forEach(it => {
+    [fileVersionHead, fileVersionBase].forEach(it => {
         if (it.status == "rejected") {
             showWarning(`Не удалось получить версию файла из репозитория\n${it.reason}`);
         }
     })
 
-    if (sourceResult.status == "fulfilled" && targetResult.status == "fulfilled")
-        openDiagramModalWithContent(diagramBtn, sourceResult.value, targetResult.value);
+    if (fileVersionHead.status == "fulfilled" && fileVersionBase.status == "fulfilled")
+        openDiagramModalWithContent(diagramBtn, fileVersionHead.value, fileVersionBase.value, mrRefs);
 }
 
